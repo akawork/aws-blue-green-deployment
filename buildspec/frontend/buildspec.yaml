@@ -1,0 +1,157 @@
+# TODO parameterization
+
+version: 0.2
+
+
+
+env:
+
+  variables:
+
+    # ---------------
+
+    AWS_DEFAULT_OUTPUT: "json"
+
+    # ---------
+
+    #------------
+
+    SONAR_SCANNER_HOME: "./sonar/sonar-scanner/bin"
+
+    #------------
+    image: "date +'%d-%m-%Y_%H-%M-%S-%3N'"
+    #--------------
+
+    REPOSITORY_FRONTEND_SERVICE_URI: "FRONTENDSERVICEIMAGEURI"
+
+    #--------------
+
+    #--------------
+
+  
+  # TODO should use this for store access key id & secret
+
+
+
+
+phases:
+
+  install:
+    runtime-versions:
+      nodejs: 10
+
+    commands:
+
+      - echo === Start Docker Demon ===
+
+
+  pre_build:
+
+    commands:
+
+      - echo === Login to Amazon ECR ===
+
+      - aws --version
+
+      - $(aws ecr get-login --no-include-email --region $AWS_REGION)
+
+      - echo [DEBUG] REPOSITORY_URI=$REPOSITORY_URI
+
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+      - echo [DEBUG] COMMIT_HASH=$COMMIT_HASH
+
+      #- IMAGE_TAG=${COMMIT_HASH:=latest}
+
+      - image=$(date +'%d-%m-%Y_%H-%M-%S-%3N')
+
+      - echo image=$image
+
+      - IMAGE_TAG=$image
+
+      - echo [DEBUG] IMAGE_TAG=$IMAGE_TAG
+
+
+
+  build:
+
+    commands:
+
+      #--------------
+      - sed -i "s~$(printf $REPOSITORY_FRONTEND_SERVICE_URI)~$(printf $REPOSITORY_FRONTEND_SERVICE_URI):$(printf $IMAGE_TAG)~g" ./taskdeffrontendservice.json
+      - echo Build started on `date`
+      
+      - docker images
+
+      - docker build . -t my-angular-app:latest
+      #--------------
+
+
+      #-------------
+
+  post_build:
+
+    commands:
+
+      #-------------
+
+      - echo Build completed on `date`
+
+      - echo docker tag for images
+
+      - docker images # DEBUG
+
+
+      - docker tag my-angular-app:latest $REPOSITORY_FRONTEND_SERVICE_URI:$IMAGE_TAG
+
+      - docker tag my-angular-app:latest $REPOSITORY_FRONTEND_SERVICE_URI:latest
+
+      #----------------
+
+      #----------------
+
+      - echo Pushing the Docker images...
+
+      - docker images
+
+
+      - docker push $REPOSITORY_FRONTEND_SERVICE_URI:$IMAGE_TAG
+
+      - docker push $REPOSITORY_FRONTEND_SERVICE_URI:latest
+
+      #----------------
+
+      #--------------------------
+
+      - echo Writing image definitions file...
+
+
+      - printf '[{"name":"dev-frontend-service","imageUri":"%s"}]' $REPOSITORY_FRONTEND_SERVICE_URI:$IMAGE_TAG > dev-frontend-service.json
+
+      #-----------
+
+      #-----------
+
+      #- echo [DEBUG] imagedefinitions.json
+
+      - cat dev-frontend-service.json
+
+      
+
+cache:
+
+  paths:
+
+    - '/root/.m2/**/*'
+
+
+
+artifacts:
+
+    files: 
+
+      - dev-frontend-service.json
+      - taskdeffrontendservice-dev.json
+      - appspecfrontendservice-dev.yaml
+      - taskdeffrontendservice-staging.json
+      - appspecfrontendservice-staging.yaml

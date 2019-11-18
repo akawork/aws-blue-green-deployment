@@ -1,0 +1,30 @@
+{
+  "Comment": "Update Record",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "APIRECORDDOMAINNAME",
+		"Type": "APIRECORDTYPE",
+		"TTL": 300,
+		"ResourceRecords": [
+			{
+				"Value": "APIRECORDVALUE"
+			}
+		]
+      }
+    },
+	{
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "APPRECORDDOMAINNAME",
+            "Type": "APPRECORDTYPE",
+            "AliasTarget": {
+                "HostedZoneId": "APPHOSTEDZONEDID",
+                "DNSName": "dualstack.APPDNSNAME.",
+                "EvaluateTargetHealth": false
+            }
+      }
+    }
+  ]
+}

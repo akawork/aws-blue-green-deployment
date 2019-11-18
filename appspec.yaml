@@ -1,0 +1,16 @@
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: "TASKDEFARN"
+        LoadBalancerInfo:
+          ContainerName: "TASKNAME"
+          ContainerPort: PORT
+# Optional properties
+        PlatformVersion: "LATEST"
+        NetworkConfiguration:
+          AwsvpcConfiguration:
+            Subnets: ["SERVICESUBNET1","SERVICESUBNET2"]
+            SecurityGroups: ["SERVICESG"]
+            AssignPublicIp: "PUBLICIPOPTION"

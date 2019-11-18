@@ -1,0 +1,65 @@
+version: 0.2
+
+env:
+  variables:
+     AWS_DEFAULT_OUTPUT: "json"
+     SONAR_DOCKERFILE_ADDRESS: "./sonarDocker"
+     REPOSITORY_SONAR_SCANNER_URI: "SONARSCANNERIMAGEURI"
+
+
+phases:
+  install:
+    runtime-versions:
+      java: openjdk8
+
+    commands:
+      - echo === Start Docker Demon ===
+  pre_build:
+    commands:
+      - echo === Login to Amazon ECR ===
+      - aws --version
+      - $(aws ecr get-login --no-include-email --region $AWS_REGION)
+      - echo === Login to Amazon ECR ===
+
+      - echo [DEBUG] REPOSITORY_URI=$REPOSITORY_URI
+
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+      - echo [DEBUG] COMMIT_HASH=$COMMIT_HASH
+
+      - image=$(date +'%d-%m-%Y_%H-%M-%S-%3N')
+
+      - echo image=$image
+
+      - IMAGE_TAG=$image
+
+      - echo [DEBUG] IMAGE_TAG=$IMAGE_TAG
+  build:
+    commands:
+      - echo Build started on `date`
+      - cd $SONAR_DOCKERFILE_ADDRESS
+      - docker build -t cloud-demo-sonar-scanner:latest .
+      - docker tag cloud-demo-sonar-scanner:latest $REPOSITORY_SONAR_SCANNER_URI:$IMAGE_TAG
+      - docker push $REPOSITORY_SONAR_SCANNER_URI:$IMAGE_TAG
+  post_build:
+    commands:
+
+      #----------------
+
+      #----------------
+
+      - echo Pushing the Docker images...
+
+      - docker images
+      
+
+      - docker tag cloud-demo-sonar-scanner:latest $REPOSITORY_SONAR_SCANNER_URI:latest
+
+      - docker push $REPOSITORY_SONAR_SCANNER_URI:latest
+      #-------------
+      - echo Build completed on `date`
+      
+
+cache:
+  paths:
+    - '/root/.m2/**/*'

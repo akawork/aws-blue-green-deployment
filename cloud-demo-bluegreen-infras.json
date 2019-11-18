@@ -1,0 +1,1318 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Parameters":{
+		"DatabaseUser": {
+			"Description": "DATABASE USER of Cloud Demo DB",
+			"Type": "String"
+		},
+		"DatabasePassword": {
+			"Description": "DATABASE PASSWORD of Cloud Demo DB",
+			"Type": "String"
+		},
+		"KeyPairName": {
+			"Description": "Key pair of Cloud Demo Bastion",
+			"Type": "String"
+		},
+		"APICertificateARN":{
+			"Description": "AWS ACM Regional Certificate ARN for API Domain Endpoint",
+			"Type": "String"
+		},
+		"ApplicationCertificateARN":{
+			"Description": "AWS ACM Regional Certificate ARN for Application domain",
+			"Type": "String"
+		},
+		"BastionImageID":{
+			"Description": "Image ID for bastion",
+			"Type": "String"
+		},
+		"EnvironmentType":{
+			"Description":"The target deployment environment of infratructure",
+			"Type":"String",
+			"Default" : "dev",
+			"AllowedValues" : ["dev", "staging"]
+		}
+	},
+	"Conditions" : {
+		"CreateStagingResources" : {"Fn::Equals" : [{"Ref" : "EnvironmentType"}, "staging"]},
+		"CreateDevResources" : {"Fn::Equals" : [{"Ref" : "EnvironmentType"}, "dev"]},
+		"CreateTestResources" : {"Fn::Equals" : [{"Ref" : "EnvironmentType"}, "test"]}
+	},
+	"Resources":{
+		"demoVPC":{
+			"Type" : "AWS::EC2::VPC",
+			"Properties" : {
+				"CidrBlock" : "10.0.0.0/16",
+				"EnableDnsSupport" : "true",
+				"EnableDnsHostnames" : "true",
+				"InstanceTenancy" : "default",
+				"Tags" : [ 
+				{
+					"Key" : "Name", 
+					"Value" :{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-vpc"]]}
+				}
+				]
+			}
+		},
+		"demoSubnetPublic1":{
+			"Type" : "AWS::EC2::Subnet",
+			"Properties" : {
+				"AvailabilityZone" : {"Fn::Join" : [ "", [ { "Ref" : "AWS::Region" }, "a"]]},
+				"CidrBlock" : "10.0.1.0/24",
+				"VpcId" : {
+				  "Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-subnet-public-1"]]}
+				} 
+				]
+			}
+		},
+		"demoSubnetPublic2":{
+			"Type" : "AWS::EC2::Subnet",
+			"Properties" : {
+				"AvailabilityZone" : {"Fn::Join" : [ "", [ { "Ref" : "AWS::Region" }, "b"]]},
+				"CidrBlock" : "10.0.2.0/24",
+				"VpcId" : {
+				  "Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-subnet-public-2"]]}
+				} 
+				]
+			}
+		},
+		"demoSubnetPrivate1":{
+			"Type" : "AWS::EC2::Subnet",
+			"Properties" : {
+				"AvailabilityZone" : {"Fn::Join" : [ "", [ { "Ref" : "AWS::Region" }, "a"]]},
+				"CidrBlock" : "10.0.3.0/24",
+				"VpcId" : {
+				  "Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-subnet-private-1"]]}
+				} 
+				]
+			}
+		},
+		"demoSubnetPrivate2":{
+			"Type" : "AWS::EC2::Subnet",
+			"Properties" : {
+				"AvailabilityZone" : {"Fn::Join" : [ "", [ { "Ref" : "AWS::Region" }, "b"]]},
+				"CidrBlock" : "10.0.4.0/24",
+				"VpcId" : {
+				  "Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-subnet-private-2"]]}
+				} 
+				]
+			}
+		},
+		"demoSubnetRDS1":{
+			"Type" : "AWS::EC2::Subnet",
+			"Properties" : {
+				"AvailabilityZone" : {"Fn::Join" : [ "", [ { "Ref" : "AWS::Region" }, "a"]]},
+				"CidrBlock" : "10.0.5.0/24",
+				"VpcId" : {
+				  "Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-subnet-rds-1"]]}
+				} 
+				]
+			}
+		},
+		"demoSubnetRDS2":{
+			"Type" : "AWS::EC2::Subnet",
+			"Properties" : {
+				"AvailabilityZone" : {"Fn::Join" : [ "", [ { "Ref" : "AWS::Region" }, "b"]]},
+				"CidrBlock" : "10.0.6.0/24",
+				"VpcId" : {
+					"Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-subnet-rds-2"]]}
+				} 
+				]
+			}
+		},
+		"demoRouteTablePublic":{
+			"Type" : "AWS::EC2::RouteTable",
+			"Properties" : {
+				"VpcId" : {
+					"Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-routetable-public"]]}
+				}
+				]
+			}
+		},
+		"demoRouteTablePrivate":{
+			"Type" : "AWS::EC2::RouteTable",
+			"Properties" : {
+				"VpcId" : {
+					"Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-routetable-private"]]}
+				}
+				]
+			}
+		},
+		"demoRouteTableRDS":{
+			"Type" : "AWS::EC2::RouteTable",
+			"Properties" : {
+				"VpcId" : {
+					"Ref": "demoVPC"
+				},
+				"Tags" : [ 
+				{
+					"Key":"Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-routetable-rds"]]}
+				}
+				]
+			}
+		},
+		"demoPublicSubnetRouteAssociate1" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPublic1" },
+				"RouteTableId" : { "Ref" : "demoRouteTablePublic" }
+			}
+		},
+		"demoPublicSubnetRouteAssociate2" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPublic2" },
+				"RouteTableId" : { "Ref" : "demoRouteTablePublic" }
+			}
+		},
+		"demoPrivateSubnetRouteAssociate1" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPrivate1" },
+				"RouteTableId" : { "Ref" : "demoRouteTablePrivate" }
+			}
+		},
+		"demoPrivateSubnetRouteAssociate2" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPrivate2" },
+				"RouteTableId" : { "Ref" : "demoRouteTablePrivate" }
+			}
+		},
+		"demoRDSSubnetRouteAssociate1" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetRDS1" },
+				"RouteTableId" : { "Ref" : "demoRouteTableRDS" }
+			}
+		},
+		"demoRDSSubnetRouteAssociate2" : {
+			"Type" : "AWS::EC2::SubnetRouteTableAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetRDS2" },
+				"RouteTableId" : { "Ref" : "demoRouteTableRDS" }
+			}
+		},
+		"demoNetworkAcl" : {
+		   "Type" : "AWS::EC2::NetworkAcl",
+		   "Properties" : {
+			  "VpcId" : { "Ref" : "demoVPC" },
+			  "Tags" : [ { "Key" : "Name", "Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-acl"]]} } ]
+		   }
+		},
+		"NetworkAclEntryIngress":{
+			"Type": "AWS::EC2::NetworkAclEntry",
+			"Properties": {
+				"CidrBlock": "0.0.0.0/0",
+				"Protocol": "-1",
+				"RuleAction": "allow",
+				"RuleNumber": "100",
+				"NetworkAclId": {
+				  "Ref": "demoNetworkAcl"
+				}
+			}
+		},
+		"NetworkAclEntryEgress":{
+			"Type": "AWS::EC2::NetworkAclEntry",
+			"Properties": {
+				"CidrBlock": "0.0.0.0/0",
+				"Egress": "true",
+				"Protocol": "-1",
+				"RuleAction": "allow",
+				"RuleNumber": "100",
+				"NetworkAclId": {
+				  "Ref": "demoNetworkAcl"
+				}
+			}
+		},
+		"SubnetACLAssociation1" : {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPublic1" },
+				"NetworkAclId" : { "Ref" : "demoNetworkAcl" }
+			}
+		},
+		"SubnetACLAssociation2" : {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPublic2" },
+				"NetworkAclId" : { "Ref" : "demoNetworkAcl" }
+			}
+		},
+		"SubnetACLAssociation3" : {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPrivate1" },
+				"NetworkAclId" : { "Ref" : "demoNetworkAcl" }
+			}
+		},
+		"SubnetACLAssociation4" : {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetPrivate2" },
+				"NetworkAclId" : { "Ref" : "demoNetworkAcl" }
+			}
+		},
+		"SubnetACLAssociation5" : {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetRDS1" },
+				"NetworkAclId" : { "Ref" : "demoNetworkAcl" }
+			}
+		},
+		"SubnetACLAssociation6" : {
+			"Type" : "AWS::EC2::SubnetNetworkAclAssociation",
+			"Properties" : {
+				"SubnetId" : { "Ref" : "demoSubnetRDS2" },
+				"NetworkAclId" : { "Ref" : "demoNetworkAcl" }
+			}
+		},
+		"demoDHCPOption": {
+			"Type": "AWS::EC2::DHCPOptions",
+			"Properties": {
+				"DomainName": {"Fn::Join" : [ "", [{ "Ref" : "AWS::Region" }, ".compute.internal"]]},
+				"DomainNameServers": [
+				  "AmazonProvidedDNS"
+				]
+			}
+		},
+		"dhcpVPCAssociation": {
+			"Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+			"Properties": {
+				"VpcId": {
+				  "Ref": "demoVPC"
+				},
+				"DhcpOptionsId": {
+				  "Ref": "demoDHCPOption"
+				}
+			}
+		},
+		"demoInternetGateway" : {
+			"Type" : "AWS::EC2::InternetGateway",
+			"Properties" : {
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-igw"]]}
+					}
+				]
+			}
+		},
+		"IGWVPCAttachment":{
+			"Type" : "AWS::EC2::VPCGatewayAttachment",
+			"Properties" : {
+				"VpcId" : { "Ref" : "demoVPC" },
+				"InternetGatewayId" : { "Ref" : "demoInternetGateway" }
+			}
+		},
+		"EIPforNAT": {
+			"Type": "AWS::EC2::EIP",
+			"Properties": {
+				"Domain": "vpc"
+			}
+		},
+		"demoNATGateway" : {
+			"Type" : "AWS::EC2::NatGateway",
+			"DependsOn" : "IGWVPCAttachment",
+			"Properties" : {
+				"AllocationId" : { "Fn::GetAtt" : ["EIPforNAT", "AllocationId"]},
+				"SubnetId" : { "Ref" : "demoSubnetPublic1"},
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-natgw"]]}
+					}]
+			}
+		},
+		
+		"IGWtoPublicRoutableAssociation": {
+			"Type": "AWS::EC2::Route",
+			"DependsOn": "IGWVPCAttachment",
+			"Properties": {
+				"DestinationCidrBlock": "0.0.0.0/0",
+				"RouteTableId": {
+				  "Ref": "demoRouteTablePublic"
+				},
+				"GatewayId": {
+				  "Ref": "demoInternetGateway"
+				}
+			}
+		},
+		"NATtoPrivateRoutableAssociation": {
+			"Type": "AWS::EC2::Route",
+			"Properties": {
+				"DestinationCidrBlock": "0.0.0.0/0",
+				"RouteTableId": {
+				  "Ref": "demoRouteTablePrivate"
+				},
+				"NatGatewayId": {
+				  "Ref": "demoNATGateway"
+				}
+			}
+		},
+		"BastionSG":{
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription":"Security group for bastion",
+				"VpcId" : {"Ref" : "demoVPC"},
+				"SecurityGroupIngress" : [{
+					"IpProtocol" : "tcp",
+					"FromPort" : 22,
+					"ToPort" : 22,
+					"CidrIp" : "0.0.0.0/0"
+				}],
+				"SecurityGroupEgress":[{
+					"IpProtocol" : "-1",
+					"CidrIp" : "0.0.0.0/0"
+				}],
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-sg-bastion"]]}
+					}]
+			}
+		},
+		"ALBSG":{
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription":"Security group for ALB",
+				"VpcId" : {"Ref" : "demoVPC"},
+				"SecurityGroupIngress" : [
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : 80,
+					"ToPort" : 80,
+					"CidrIp" : "0.0.0.0/0"
+				},
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : 443,
+					"ToPort" : 443,
+					"CidrIp" : "0.0.0.0/0"
+				}
+				],
+				"SecurityGroupEgress":[{
+					"IpProtocol" : "-1",
+					"CidrIp" : "0.0.0.0/0"
+				}],
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-sg-alb"]]}
+					}]
+			}
+		},
+		"productServiceSG":{
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription":"Security group for product service",
+				"VpcId" : {"Ref" : "demoVPC"},
+				"SecurityGroupIngress" : [{
+					"IpProtocol" : "tcp",
+					"FromPort" : 9002,
+					"ToPort" : 9002,
+					"CidrIp" : "10.0.0.0/16"
+				}],
+				"SecurityGroupEgress":[{
+					"IpProtocol" : "-1",
+					"CidrIp" : "0.0.0.0/0"
+				}],
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-sg-productservice"]]}
+					}]
+			}
+		},
+		"orderServiceSG":{
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription":"Security group for order service",
+				"VpcId" : {"Ref" : "demoVPC"},
+				"SecurityGroupIngress" : [{
+					"IpProtocol" : "tcp",
+					"FromPort" : 9001,
+					"ToPort" : 9001,
+					"CidrIp" : "10.0.0.0/16"
+				}],
+				"SecurityGroupEgress":[{
+					"IpProtocol" : "-1",
+					"CidrIp" : "0.0.0.0/0"
+				}],
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-sg-orderservice"]]}
+					}]
+			}
+		},
+		"frontendServiceSG":{
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription":"Security group for frontend service",
+				"VpcId" : {"Ref" : "demoVPC"},
+				"SecurityGroupIngress" : [
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : 80,
+					"ToPort" : 80,
+					"SourceSecurityGroupId": { "Ref" : "ALBSG" }
+				},
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : 443,
+					"ToPort" : 443,
+					"SourceSecurityGroupId": { "Ref" : "ALBSG" }
+				}
+				],
+				"SecurityGroupEgress":[{
+					"IpProtocol" : "-1",
+					"CidrIp" : "0.0.0.0/0"
+				}],
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-sg-frontendservice"]]}
+					}]
+			}
+		},
+		"RDSSG":{
+			"Type" : "AWS::EC2::SecurityGroup",
+			"Properties" : {
+				"GroupDescription":"Security group for RDS",
+				"VpcId" : {"Ref" : "demoVPC"},
+				"SecurityGroupIngress" : [
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : 3306,
+					"ToPort" : 3306,
+					"SourceSecurityGroupId": { "Ref" : "BastionSG" }
+				},
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : 3306,
+					"ToPort" : 3306,
+					"SourceSecurityGroupId": { "Ref" : "productServiceSG" }
+				},
+				{
+					"IpProtocol" : "tcp",
+					"FromPort" : 3306,
+					"ToPort" : 3306,
+					"SourceSecurityGroupId": { "Ref" : "orderServiceSG" }
+				}
+				],
+				"Tags" : [ 
+					{
+					"Key" : "Name", 
+					"Value" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-sg-rds"]]}
+					}]
+			}
+		},
+		
+		"BastionInstance": {
+			"Type": "AWS::EC2::Instance",
+			"Properties": {
+				"DisableApiTermination": "false",
+				"InstanceInitiatedShutdownBehavior": "stop",
+				"ImageId": {"Ref":"BastionImageID"},
+				"InstanceType": "t2.micro",
+				"KeyName": {"Ref":"KeyPairName"},
+				"Monitoring": "false",
+				"Tags": [
+				  {
+					"Key": "Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-bastion"]]}
+				  }
+				],
+				"BlockDeviceMappings" : [
+				  {
+					 "DeviceName":"/dev/xvda",
+					 "Ebs": {
+						"VolumeType": "gp2",
+						"VolumeSize": "8",
+						"DeleteOnTermination": false
+					 }
+				  }
+				],
+				"NetworkInterfaces": [
+				  {
+				    "AssociatePublicIpAddress":true,
+					"DeleteOnTermination": true,
+					"Description": "Primary network interface",
+					"DeviceIndex": 0,
+					"SubnetId": {
+					   "Ref" : "demoSubnetPublic1"
+					},
+					"PrivateIpAddresses": [
+					  {
+						"PrivateIpAddress": "10.0.1.217",
+						"Primary": "true"
+					  }
+					],
+					"GroupSet": [
+					  {
+						 "Ref" : "BastionSG"
+					  }
+					]
+				  }
+				]
+			}
+		},
+		"BastionEIP": {
+			"Type" : "AWS::EC2::EIP",
+			"DependsOn" : "BastionInstance",
+			"Properties" : {
+			  "Domain" : "vpc",
+			  "InstanceId" : {"Ref" : "BastionInstance"}
+			}
+		},
+		"dbRDSSubnetGroup": {
+			"Type": "AWS::RDS::DBSubnetGroup",
+			"Properties": {
+				"DBSubnetGroupDescription": "DB subnet group for cloud demo",
+				"SubnetIds": [
+					{
+					"Ref": "demoSubnetRDS1"
+					},
+					{
+					"Ref": "demoSubnetRDS2"
+					}
+				],
+				"Tags": [
+				  {
+					"Key": "Name",
+					"Value":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-dbsubnet"]]}
+				  }
+				]
+			}
+		},
+		"demoDBInstance": {
+			"Type": "AWS::RDS::DBInstance",
+			"Properties": {
+				"AllocatedStorage": "20",
+				"AllowMajorVersionUpgrade": "false",
+				"AutoMinorVersionUpgrade": "false",
+				"DBInstanceClass": "db.t2.micro",
+				"DBInstanceIdentifier":{"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-db"]]},
+				"Port": "3306",
+				"StorageType": "gp2",
+				"BackupRetentionPeriod": 0,
+				"MasterUsername": {"Ref":"DatabaseUser"},
+				"MasterUserPassword": {"Ref":"DatabasePassword"},
+				"DBName": "product_db",
+				"Engine": "mysql",
+				"EngineVersion": "5.7",
+				"MultiAZ" : false,
+				"PubliclyAccessible": "false",
+				"StorageEncrypted": "false",
+				"DeletionProtection" : false,
+				"DBSubnetGroupName": {
+				   "Ref" : "dbRDSSubnetGroup" 
+				},
+				"VPCSecurityGroups": [
+				  {
+					 "Ref" : "RDSSG"
+				  }
+				],
+				"Tags": [
+				  {
+					"Key": "workload-type",
+					"Value": "other"
+				  }
+				]
+			}
+		},
+		"demoBackEndNLB" : {
+			"Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+			"Description": "Create Network load balancer",
+			"Properties": {
+			"Name" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-nlb"]]},
+			"IpAddressType" : "ipv4",
+			"Scheme" : "internal",
+			"Subnets" : [ { "Ref":"demoSubnetPrivate1" }, { "Ref":"demoSubnetPrivate2" } ],
+			"Type" : "network"
+			}
+		},
+		"demoFrontEndALB" : {
+			"Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+			"Properties": {
+				"Name" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-alb"]]},
+				"IpAddressType" : "ipv4",
+				"Scheme" : "internet-facing",
+				"SecurityGroups" : [ {"Ref":"ALBSG"} ],
+				"Subnets" : [ { "Ref":"demoSubnetPublic1" }, { "Ref":"demoSubnetPublic2" }],
+				"Type" : "application"
+			}
+		},
+		"demoECSCluster": {
+			"Type": "AWS::ECS::Cluster",
+			"Description": "Create ECS clusters",
+			"Properties" : {
+				"ClusterName" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-cluster"]]}
+			}
+		},
+		"privateDNSNameSpace" : {
+			"Type" : "AWS::ServiceDiscovery::PrivateDnsNamespace",
+			"Properties" : {
+				"Vpc" : { "Ref":"demoVPC" },
+				"Name" : "local"
+			}
+		},
+		"demoProductServiceTG1" : {
+			"Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+			"Properties" : {
+				"HealthCheckIntervalSeconds": 30,
+				"HealthCheckProtocol": "TCP",
+				"HealthCheckTimeoutSeconds": 10,
+				"HealthyThresholdCount": 3,
+					"HealthCheckPort": "9002",
+				"Name": {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-tg-product-1"]]},
+				"Port": 9002,
+				"Protocol": "TCP",
+				"TargetGroupAttributes": [{
+				  "Key": "deregistration_delay.timeout_seconds",
+				  "Value": "300"
+				}],
+				"Targets": [],
+				"UnhealthyThresholdCount": 3,
+				"VpcId": { "Ref":"demoVPC" },
+				"TargetType" : "ip",
+				"Tags" : []
+			}
+		},
+		"demoProductServiceTG2" : {
+			"Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+			"Properties" : {
+				"HealthCheckIntervalSeconds": 30,
+				"HealthCheckProtocol": "TCP",
+				"HealthCheckTimeoutSeconds": 10,
+				"HealthyThresholdCount": 3,
+					"HealthCheckPort": "9002",
+				"Name": {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-tg-product-2"]]},
+				"Port": 9002,
+				"Protocol": "TCP",
+				"TargetGroupAttributes": [{
+				  "Key": "deregistration_delay.timeout_seconds",
+				  "Value": "300"
+				}],
+				"Targets": [],
+				"UnhealthyThresholdCount": 3,
+				"VpcId": { "Ref":"demoVPC" },
+				"TargetType" : "ip",
+				"Tags" : []
+			}
+		},
+		"ProductServiceListener9002": {
+			"Type": "AWS::ElasticLoadBalancingV2::Listener",
+			"Properties": {
+				"DefaultActions": [{
+				  "Type": "forward",
+				  "TargetGroupArn": { "Ref": "demoProductServiceTG1" }
+				}],
+				"LoadBalancerArn": { "Ref": "demoBackEndNLB" },
+				"Port": "9002",
+				"Protocol": "TCP"
+			}
+		},
+		"demoProductServiceDiscovery" : {
+			"Type" : "AWS::ServiceDiscovery::Service",
+			"Properties" : {
+			"Description" : {"Fn::Join" : [ "", [{ "Ref" : "EnvironmentType" },"-product-service"]]},
+			"DnsConfig" : {
+			"DnsRecords" : [ {
+			   "Type" : "A",
+			   "TTL" : "60"
+			} ],
+			"NamespaceId" : {"Ref":"privateDNSNameSpace"}
+			},
+			"HealthCheckCustomConfig" : {
+			"FailureThreshold" : 1
+			},
+			"Name" : {"Fn::Join" : [ "", [{ "Ref" : "EnvironmentType" },"-product-service"]]}
+			}
+		},
+		"demoOrderServiceTG1" : {
+			"Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+			"Properties" : {
+				"HealthCheckIntervalSeconds": 30,
+				"HealthCheckProtocol": "TCP",
+				"HealthCheckTimeoutSeconds": 10,
+				"HealthyThresholdCount": 3,
+					"HealthCheckPort": "9001",
+				"Name": {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-tg-order-1"]]},
+				"Port": 9001,
+				"Protocol": "TCP",
+				"TargetGroupAttributes": [{
+				  "Key": "deregistration_delay.timeout_seconds",
+				  "Value": "300"
+				}],
+				"Targets": [],
+				"UnhealthyThresholdCount": 3,
+				"VpcId": { "Ref":"demoVPC" },
+				"TargetType" : "ip",
+				"Tags" : []
+			}
+		},
+		"demoOrderServiceTG2" : {
+			"Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+			"Properties" : {
+				"HealthCheckIntervalSeconds": 30,
+				"HealthCheckProtocol": "TCP",
+				"HealthCheckTimeoutSeconds": 10,
+				"HealthyThresholdCount": 3,
+					"HealthCheckPort": "9001",
+				"Name": {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-tg-order-2"]]},
+				"Port": 9001,
+				"Protocol": "TCP",
+				"TargetGroupAttributes": [{
+				  "Key": "deregistration_delay.timeout_seconds",
+				  "Value": "300"
+				}],
+				"Targets": [],
+				"UnhealthyThresholdCount": 3,
+				"VpcId": { "Ref":"demoVPC" },
+				"TargetType" : "ip",
+				"Tags" : []
+			}
+		},
+		"OrderServiceListener9001": {
+			"Type": "AWS::ElasticLoadBalancingV2::Listener",
+			"Properties": {
+				"DefaultActions": [{
+				  "Type": "forward",
+				  "TargetGroupArn": { "Ref": "demoOrderServiceTG1" }
+				}],
+				"LoadBalancerArn": { "Ref": "demoBackEndNLB" },
+				"Port": "9001",
+				"Protocol": "TCP"
+			}
+		},
+		"demoOrderServiceDiscovery" : {
+			"Type" : "AWS::ServiceDiscovery::Service",
+			"Properties" : {
+			"Description" : {"Fn::Join" : [ "", [{ "Ref" : "EnvironmentType" },"-order-service"]]},
+			"DnsConfig" : {
+			"DnsRecords" : [ {
+			   "Type" : "A",
+			   "TTL" : "60"
+			} ],
+			"NamespaceId" : {"Ref":"privateDNSNameSpace"}
+			},
+			"HealthCheckCustomConfig" : {
+			"FailureThreshold" : 1
+			},
+			"Name" : {"Fn::Join" : [ "", [{ "Ref" : "EnvironmentType" },"-order-service"]]}
+			}
+		},
+		"demoFrontEndServiceTG1" : {
+			"Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+			"Properties" : {
+				"HealthCheckIntervalSeconds": 30,
+				"HealthCheckProtocol": "HTTP",
+				"HealthCheckTimeoutSeconds": 10,
+				"HealthyThresholdCount": 3,
+				"HealthCheckPort": "80",
+				"Name": {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-tg-frontend-1"]]},
+				"Port": 80,
+				"Protocol": "HTTP",
+				"TargetGroupAttributes": [{
+				  "Key": "deregistration_delay.timeout_seconds",
+				  "Value": "300"
+				}],
+				"Targets": [],
+				"UnhealthyThresholdCount": 3,
+				"VpcId": { "Ref":"demoVPC" },
+				"TargetType" : "ip",
+				"Tags" : []
+			}
+		},
+		"demoFrontEndServiceTG2" : {
+			"Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+			"Properties" : {
+				"HealthCheckIntervalSeconds": 30,
+				"HealthCheckProtocol": "HTTP",
+				"HealthCheckTimeoutSeconds": 10,
+				"HealthyThresholdCount": 3,
+				"HealthCheckPort": "80",
+				"Name": {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-tg-frontend-2"]]},
+				"Port": 80,
+				"Protocol": "HTTP",
+				"TargetGroupAttributes": [{
+				  "Key": "deregistration_delay.timeout_seconds",
+				  "Value": "300"
+				}],
+				"Targets": [],
+				"UnhealthyThresholdCount": 3,
+				"VpcId": { "Ref":"demoVPC" },
+				"TargetType" : "ip",
+				"Tags" : []
+			}
+		},
+		"FrontEndServiceListener80": {
+			"Type": "AWS::ElasticLoadBalancingV2::Listener",
+			"Properties": {
+				"DefaultActions": [{
+				  "Type": "forward",
+				  "TargetGroupArn": { "Ref": "demoFrontEndServiceTG1" }
+				}],
+				"LoadBalancerArn": { "Ref": "demoFrontEndALB" },
+				"Port": "80",
+				"Protocol": "HTTP"
+			}
+		},
+		"FrontEndServiceListener443": {
+			"Type": "AWS::ElasticLoadBalancingV2::Listener",
+			"Properties": {
+				"Certificates" : [{"CertificateArn":{"Ref":"ApplicationCertificateARN"}}],
+				"DefaultActions": [{
+				  "Type": "forward",
+				  "TargetGroupArn": { "Ref": "demoFrontEndServiceTG1" }
+				}],
+				"LoadBalancerArn": { "Ref": "demoFrontEndALB" },
+				"Port": "443",
+				"Protocol": "HTTPS"
+			}
+		},
+		"demoFrontEndServiceDiscovery" : {
+			"Type" : "AWS::ServiceDiscovery::Service",
+			"Properties" : {
+				"Description" : {"Fn::Join" : [ "", [{ "Ref" : "EnvironmentType" },"-frontend-service"]]},
+				"DnsConfig" : {
+					"DnsRecords" : [ {
+						"Type" : "A",
+						"TTL" : "60"
+					} ],
+					"NamespaceId" : {"Fn::GetAtt": ["privateDNSNameSpace", "Id"]}
+				},
+				"HealthCheckCustomConfig" : {
+				"FailureThreshold" : 1
+				},
+				"Name" : {"Fn::Join" : [ "", [{ "Ref" : "EnvironmentType" },"-frontend-service"]]}
+			}
+		},
+		"ApiGatewatRestApi":{
+			"Type" : "AWS::ApiGateway::RestApi",
+			"Properties" : {
+			  "EndpointConfiguration" : { "Types" : ["REGIONAL"] },
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-apigateway"]]}
+			}
+		},
+		"VPCLink":{
+			"Type" : "AWS::ApiGateway::VpcLink",
+			"Properties" : {
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-vpclink"]]},
+			  "TargetArns" : [ {"Ref":"demoBackEndNLB"} ]
+			}
+		},
+		"productServiceApiResource":{
+			"Type" : "AWS::ApiGateway::Resource",
+			"Properties" : {
+			  "ParentId" : { "Fn::GetAtt": ["ApiGatewatRestApi", "RootResourceId"] },
+			  "PathPart" : "productservice",
+			  "RestApiId" : {"Ref":"ApiGatewatRestApi"}
+			}
+		},
+		"productServiceProxyResource":{
+			"Type" : "AWS::ApiGateway::Resource",
+			"Properties" : {
+			  "ParentId" : { "Ref":"productServiceApiResource" },
+			  "PathPart" : "{proxy+}",
+			  "RestApiId" : {"Ref":"ApiGatewatRestApi"}
+			}
+		},
+		"productServiceProxyMethod":{
+			"Type" : "AWS::ApiGateway::Method",
+			"Properties" : {
+			  "AuthorizationType" : "NONE",
+			  "HttpMethod" : "ANY",
+			  "RequestParameters" : {"method.request.path.proxy":true},
+			  "Integration" : {
+				"CacheKeyParameters" : [ "method.request.path.proxy" ],
+				"RequestParameters" : {"integration.request.path.proxy": "method.request.path.proxy"},
+				"IntegrationHttpMethod":"ANY",
+				"Type":"HTTP_PROXY",
+				"ConnectionType":"VPC_LINK",
+				"ConnectionId" : { "Ref" : "VPCLink" },
+				"Uri" : {"Fn::Join" : [ "", [ "http://",  { "Fn::GetAtt": ["demoBackEndNLB", "DNSName"] }, ":9002/{proxy}" ] ]},
+				"PassthroughBehavior" : "WHEN_NO_MATCH",
+				"IntegrationResponses" : [ {"StatusCode" : "200"}]
+			  },
+			  "ResourceId" : {"Ref":"productServiceProxyResource"},
+			  "RestApiId" : {"Ref":"ApiGatewatRestApi"}
+			}
+		},
+		"orderServiceApiResource":{
+			"Type" : "AWS::ApiGateway::Resource",
+			"Properties" : {
+			  "ParentId" : { "Fn::GetAtt": ["ApiGatewatRestApi", "RootResourceId"] },
+			  "PathPart" : "orderservice",
+			  "RestApiId" : {"Ref":"ApiGatewatRestApi"}
+			}
+		},
+		"orderServiceProxyResource":{
+			"Type" : "AWS::ApiGateway::Resource",
+			"Properties" : {
+			  "ParentId" : { "Ref":"orderServiceApiResource" },
+			  "PathPart" : "{proxy+}",
+			  "RestApiId" : {"Ref":"ApiGatewatRestApi"}
+			}
+		},
+		"orderServiceProxyMethod":{
+			"Type" : "AWS::ApiGateway::Method",
+			"Properties" : {
+			  "AuthorizationType" : "NONE",
+			  "HttpMethod" : "ANY",
+			  "RequestParameters" : {"method.request.path.proxy":true},
+			  "Integration" : {
+				"CacheKeyParameters" : [ "method.request.path.proxy" ],
+				"RequestParameters" : {"integration.request.path.proxy": "method.request.path.proxy"},
+				"IntegrationHttpMethod":"ANY",
+				"Type":"HTTP_PROXY",
+				"ConnectionType":"VPC_LINK",
+				"ConnectionId" : { "Ref" : "VPCLink" },
+				"Uri" : {"Fn::Join" : [ "", [ "http://",  { "Fn::GetAtt": ["demoBackEndNLB", "DNSName"] }, ":9001/{proxy}" ] ]},
+				"PassthroughBehavior" : "WHEN_NO_MATCH",
+				"IntegrationResponses" : [ {"StatusCode" : "200"}]
+			  },
+			  "ResourceId" : {"Ref":"orderServiceProxyResource"},
+			  "RestApiId" : {"Ref":"ApiGatewatRestApi"}
+			}
+		},
+		"ApiDeployment":{
+			"Type" : "AWS::ApiGateway::Deployment",
+			"DependsOn":["productServiceApiResource","productServiceProxyResource","productServiceProxyMethod","orderServiceApiResource","orderServiceProxyResource","orderServiceProxyMethod","ApiGatewatRestApi"],
+			"Properties" : {
+			  "RestApiId" : {"Ref":"ApiGatewatRestApi"},
+			  "StageName" : "demo"
+			}
+		},
+		"CustomDomainName":{
+			"Type" : "AWS::ApiGateway::DomainName",
+			"Condition":"CreateStagingResources",
+			"Properties" : {
+			  "DomainName" : "api.demo.akawork.io",
+			  "EndpointConfiguration" : { "Types" : ["REGIONAL"] },
+			  "RegionalCertificateArn" : {"Ref":"APICertificateARN"}
+			}
+		},
+		"DNSBasePathMapping":{
+			"Type" : "AWS::ApiGateway::BasePathMapping",
+			"DependsOn":["ApiDeployment","CustomDomainName","ApiGatewatRestApi"],
+			"Condition":"CreateStagingResources",
+			"Properties" : {
+				"BasePath" : "demo",
+				"DomainName" : { "Ref":"CustomDomainName" },
+				"RestApiId" : { "Ref":"ApiGatewatRestApi" },
+				"Stage" : "demo"
+			  
+			}
+		},
+		"DevCustomDomainName":{
+			"Type" : "AWS::ApiGateway::DomainName",
+			"Condition":"CreateDevResources",
+			"Properties" : {
+			  "DomainName" : "api2.demo.akawork.io",
+			  "EndpointConfiguration" : { "Types" : ["REGIONAL"] },
+			  "RegionalCertificateArn" : {"Ref":"APICertificateARN"}
+			}
+		},
+		"DevDNSBasePathMapping":{
+			"Type" : "AWS::ApiGateway::BasePathMapping",
+			"DependsOn":["ApiDeployment","DevCustomDomainName","ApiGatewatRestApi"],
+			"Condition":"CreateDevResources",
+			"Properties" : {
+				"BasePath" : "demo",
+				"DomainName" : { "Ref":"DevCustomDomainName" },
+				"RestApiId" : { "Ref":"ApiGatewatRestApi" },
+				"Stage" : "demo"
+			  
+			}
+		},
+		"TestCustomDomainName":{
+			"Type" : "AWS::ApiGateway::DomainName",
+			"Condition":"CreateTestResources",
+			"Properties" : {
+			  "DomainName" : "api3.demo.akawork.io",
+			  "EndpointConfiguration" : { "Types" : ["REGIONAL"] },
+			  "RegionalCertificateArn" : {"Ref":"APICertificateARN"}
+			}
+		},
+		"TestDNSBasePathMapping":{
+			"Type" : "AWS::ApiGateway::BasePathMapping",
+			"DependsOn":["ApiDeployment","TestCustomDomainName","ApiGatewatRestApi"],
+			"Condition":"CreateTestResources",
+			"Properties" : {
+				"BasePath" : "demo",
+				"DomainName" : { "Ref":"TestCustomDomainName" },
+				"RestApiId" : { "Ref":"ApiGatewatRestApi" },
+				"Stage" : "demo"
+			  
+			}
+		},
+		"productServiceLog":{
+		  "Type" : "AWS::Logs::LogGroup",
+		  "Properties" : {
+			  "LogGroupName" : {"Fn::Join" : [ "", ["/aws/ecs/cloud-",{ "Ref" : "EnvironmentType" },"-demo-product-service"]]}
+			}
+		},
+		"orderServiceLog":{
+		  "Type" : "AWS::Logs::LogGroup",
+		  "Properties" : {
+			  "LogGroupName" : {"Fn::Join" : [ "", ["/aws/ecs/cloud-",{ "Ref" : "EnvironmentType" },"-demo-order-service"]]}
+			}
+		},
+		"frontendServiceLog":{
+		  "Type" : "AWS::Logs::LogGroup",
+		  "Properties" : {
+			  "LogGroupName" : {"Fn::Join" : [ "", ["/aws/ecs/cloud-",{ "Ref" : "EnvironmentType" },"-demo-frontend-service"]]}
+			}
+		},
+		"demoECSTaskExecutionRole":{
+			"Type" : "AWS::IAM::Role",
+			"Properties" : {
+			  "AssumeRolePolicyDocument": {
+					"Version" : "2012-10-17",
+					"Statement": [ {
+					  "Effect": "Allow",
+					  "Principal": {
+						 "Service": "ecs-tasks.amazonaws.com"
+					  },
+					  "Action": [ "sts:AssumeRole" ]
+				   } ]
+			   },
+			  "ManagedPolicyArns" : [ "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy" ],
+			  "Path" : "/",
+			  "RoleName" : {"Fn::Join" : [ "", [ "ECSTASKS-cloud-",{ "Ref" : "EnvironmentType" },"-demo-taskexecution-role-",{ "Ref" : "AWS::Region" }]]}
+			}
+		},
+		"demoCodeDeployECSRole":{
+			"Type" : "AWS::IAM::Role",
+			"Properties" : {
+			  "AssumeRolePolicyDocument": {
+					"Version" : "2012-10-17",
+					"Statement": [ {
+					  "Effect": "Allow",
+					  "Principal": {
+						 "Service": "codedeploy.amazonaws.com"
+					  },
+					  "Action": [ "sts:AssumeRole" ]
+				   } ]
+			   },
+			  "ManagedPolicyArns" : [ "arn:aws:iam::aws:policy/AWSCodeDeployRoleForECS" ],
+			  "Path" : "/",
+			  "RoleName" : {"Fn::Join" : [ "", [ "CodeDeploy-cloud-",{ "Ref" : "EnvironmentType" },"-demo-ECS-role-",{ "Ref" : "AWS::Region" }]]}
+			}
+		},
+		"ApplicationAutoScalingRole": {
+			"Type": "AWS::IAM::Role",
+			"Description": "AutoScaling Role For ECS Services",
+			"Properties": {
+				"AssumeRolePolicyDocument": {
+					"Statement": [
+						{
+							"Effect": "Allow",
+							"Principal": {
+								"Service": [
+									"application-autoscaling.amazonaws.com"
+								]
+							},
+							"Action": [
+								"sts:AssumeRole"
+							]
+						}
+					]
+				},
+				"Path": "/",
+				"Policies": [
+					{
+						"PolicyName": "ECSBlogScalingRole",
+						"PolicyDocument": {
+							"Statement": [
+								{
+									"Effect": "Allow",
+									"Action": [
+										"ecs:UpdateService",
+										"ecs:DescribeServices",
+										"application-autoscaling:*",
+										"cloudwatch:DescribeAlarms",
+										"cloudwatch:GetMetricStatistics"
+									],
+									"Resource": "*"
+								}
+							]
+						}
+					}
+				],
+				"RoleName" : {"Fn::Join" : [ "", ["ApplicationAutoscaling-cloud-",{ "Ref" : "EnvironmentType" },"-demo-role-",{ "Ref" : "AWS::Region" }]]}
+			}
+		}
+	},
+	"Outputs" : {
+		"DemoVPC" : {
+		  "Description" : "VPC ID",
+		  "Value" :  { "Ref" : "demoVPC" },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-demoVPC-ID" }}
+		},
+		"DemoSubnetPublic1" : {
+		  "Description" : "The subnet ID demoSubnetPublic1 to use for  service stack",
+		  "Value" :  { "Ref" : "demoSubnetPublic1" },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-demoSubnetPublic1-ID" }}
+		},
+		"DemoSubnetPublic2" : {
+		  "Description" : "The subnet ID demoSubnetPublic2 to use for  service stack",
+		  "Value" :  { "Ref" : "demoSubnetPublic2" },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-demoSubnetPublic2-ID" }}
+		},
+		"DemoSubnetPrivate1" : {
+		  "Description" : "The subnet ID demoSubnetPrivate1 to use for  service stack",
+		  "Value" :  { "Ref" : "demoSubnetPrivate1" },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-demoSubnetPrivate1-ID" }}
+		},
+		"DemoSubnetPrivate2" : {
+		  "Description" : "The subnet ID demoSubnetPrivate2 to use for  service stack",
+		  "Value" :  { "Ref" : "demoSubnetPrivate2" },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-demoSubnetPrivate2-ID" }}
+		},
+		"DemoSubnetRDS1" : {
+		  "Description" : "The subnet ID demoSubnetRDS1 to use for  service stack",
+		  "Value" :  { "Ref" : "demoSubnetRDS1" },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-demoSubnetRDS1-ID" }}
+		},
+		"DemoSubnetRDS2" : {
+		  "Description" : "The subnet ID demoSubnetRDS2 to use for  service stack",
+		  "Value" :  { "Ref" : "demoSubnetRDS2" },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-demoSubnetRDS2-ID" }}
+		},
+		"ALBSG" : {
+		  "Description" : "The security group ID ALBSG to use for  service stack",
+		  "Value" :  { "Fn::GetAtt" : ["ALBSG", "GroupId"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-ALBSG-ID" }}
+		},
+		"FrontendServiceSG" : {
+		  "Description" : "The security group ID frontendServiceSG to use for  service stack",
+		  "Value" :  { "Fn::GetAtt" : ["frontendServiceSG", "GroupId"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-frontendServiceSG-ID" }}
+		},
+		"ProductServiceSG" : {
+		  "Description" : "The security group ID productServiceSG to use for  service stack",
+		  "Value" :  { "Fn::GetAtt" : ["productServiceSG", "GroupId"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-productServiceSG-ID" }}
+		},
+		"RDSSG" : {
+		  "Description" : "The security group ID RDSSG to use for  service stack",
+		  "Value" :  { "Fn::GetAtt" : ["RDSSG", "GroupId"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-RDSSG-ID" }}
+		},
+		"OrderServiceSG" : {
+		  "Description" : "The security group ID orderServiceSG to use for  service stack",
+		  "Value" :  { "Fn::GetAtt" : ["orderServiceSG", "GroupId"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-orderServiceSG-ID" }}
+		},
+		"RDSEndpoint" : {
+		  "Description" : "RDS Endpoint",
+		  "Value" :  { "Fn::GetAtt" : ["demoDBInstance", "Endpoint.Address"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-RDS-EndpointAddress" }}
+		},
+		"ProductServiceTG1" : {
+		  "Description" : "Target group 1 of product service",
+		  "Value" :  { "Fn::GetAtt" : ["demoProductServiceTG1", "TargetGroupName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-productServiceTG1" }}
+		},
+		"ProductServiceTG2" : {
+		  "Description" : "Target group 2 of product service",
+		  "Value" :  { "Fn::GetAtt" : ["demoProductServiceTG2", "TargetGroupName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-productServiceTG2" }}
+		},
+		"OrderServiceTG1" : {
+		  "Description" : "Target group 1 of order service",
+		  "Value" :  { "Fn::GetAtt" : ["demoOrderServiceTG1", "TargetGroupName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-orderServiceTG1" }}
+		},
+		"OrderServiceTG2" : {
+		  "Description" : "Target group 2 of order service",
+		  "Value" :  { "Fn::GetAtt" : ["demoOrderServiceTG2", "TargetGroupName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-orderServiceTG2" }}
+		},
+		"FrontendServiceTG1" : {
+		  "Description" : "Target group 1 of frontend service",
+		  "Value" :  { "Fn::GetAtt" : ["demoFrontEndServiceTG1", "TargetGroupName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-frontendServiceTG1" }}
+		},
+		"FrontendServiceTG2" : {
+		  "Description" : "Target group 2 of frontend service",
+		  "Value" :  { "Fn::GetAtt" : ["demoFrontEndServiceTG2", "TargetGroupName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-frontendServiceTG2" }}
+		},
+		"ProductServiceDiscoveryARN":{
+		  "Description" : "arn of discovery service",
+		  "Value" :  { "Fn::GetAtt" : ["demoProductServiceDiscovery", "Arn"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-productServiceDiscovery" }}
+		},
+		"OrderServiceDiscoveryARN":{
+		  "Description" : "arn of discovery service",
+		  "Value" :  { "Fn::GetAtt" : ["demoOrderServiceDiscovery", "Arn"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-orderServiceDiscovery" }}
+		},
+		"FrontendServiceDiscoveryARN":{
+		  "Description" : "arn of discovery service",
+		  "Value" :  { "Fn::GetAtt" : ["demoFrontEndServiceDiscovery", "Arn"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-frontendServiceDiscovery" }}
+		},
+		"ECSClusterARN":{
+		  "Description" : "arn of ecs cluster",
+		  "Value" :  { "Fn::GetAtt" : ["demoECSCluster", "Arn"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-ECSClusterARN" }}
+		},
+		"NLBName":{
+		  "Description" : "name of network load balancer",
+		  "Value" :  { "Fn::GetAtt" : ["demoBackEndNLB", "LoadBalancerName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-NLBName" }}
+		},
+		"ALBName":{
+		  "Description" : "name of application load balancer",
+		  "Value" :  { "Fn::GetAtt" : ["demoFrontEndALB", "LoadBalancerName"] },
+		  "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-ALBName" }}
+		}
+	}
+  
+}

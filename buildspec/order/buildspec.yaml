@@ -1,0 +1,155 @@
+# TODO parameterization
+
+version: 0.2
+
+
+
+env:
+
+  variables:
+
+    # ---------------
+
+    AWS_DEFAULT_OUTPUT: "json"
+
+    # ---------
+
+    #------------
+
+    SONAR_SCANNER_HOME: "./sonar/sonar-scanner/bin"
+
+    #------------
+    #--------------
+
+    REPOSITORY_ORDER_SERVICE_URI: "ORDERSERVICEIMAGEURI"
+
+    #--------------
+
+    #--------------
+
+
+
+phases:
+
+  install:
+    runtime-versions:
+      java: openjdk8
+
+    commands:
+
+      - echo === Start Docker Demon ===
+
+
+  pre_build:
+
+    commands:
+
+      - echo === Login to Amazon ECR ===
+
+      - aws --version
+
+      - $(aws ecr get-login --no-include-email --region $AWS_REGION)
+
+      - echo [DEBUG] REPOSITORY_URI=$REPOSITORY_URI
+
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+
+      - echo [DEBUG] COMMIT_HASH=$COMMIT_HASH
+
+      - image=$(date +'%d-%m-%Y_%H-%M-%S-%3N')
+
+      - echo image=$image
+
+      - IMAGE_TAG=$image
+
+      - echo [DEBUG] IMAGE_TAG=$IMAGE_TAG
+
+
+
+  build:
+
+    commands:
+
+      #--------------
+
+      - echo Build started on `date`
+      - sed -i 's/-Dspring.profiles.active=docker_dev/-Dspring.profiles.active=docker_dev/gi' ./orderservice/Dockerfile
+      - sed -i "s~$(printf $REPOSITORY_ORDER_SERVICE_URI)~$(printf $REPOSITORY_ORDER_SERVICE_URI):$(printf $IMAGE_TAG)~g" ./taskdeforderservice.json
+      - mvn clean install -DskipTests -P common
+
+      - mvn clean install -DskipTests -Ddocker.image.version=latest -P orderservice-build
+      - docker images
+      
+      #--------------
+
+
+      #-------------
+
+  post_build:
+
+    commands:
+
+      #-------------
+
+      - echo Build completed on `date`
+
+      - echo docker tag for images
+
+      - docker images # DEBUG
+
+
+      - docker tag orderservice:latest $REPOSITORY_ORDER_SERVICE_URI:$IMAGE_TAG
+
+      - docker tag orderservice:latest $REPOSITORY_ORDER_SERVICE_URI:latest
+
+      #----------------
+
+      #----------------
+
+      - echo Pushing the Docker images...
+
+      - docker images
+
+
+      - docker push $REPOSITORY_ORDER_SERVICE_URI:$IMAGE_TAG
+
+      - docker push $REPOSITORY_ORDER_SERVICE_URI:latest
+
+      #----------------
+
+      #--------------------------
+
+      - echo Writing image definitions file...
+
+
+      - printf '[{"name":"dev-order-service","imageUri":"%s"}]' $REPOSITORY_ORDER_SERVICE_URI:$IMAGE_TAG > dev-order-service.json
+
+      
+
+      #-----------
+
+      #-----------
+
+      #- echo [DEBUG] imagedefinitions.json
+
+      - cat dev-order-service.json
+
+      
+
+cache:
+
+  paths:
+
+    - '/root/.m2/**/*'
+
+
+
+artifacts:
+
+    files: 
+
+      - dev-order-service.json
+      - appspecorderservice-dev.yaml
+      - taskdeforderservice-dev.json
+      - appspecorderservice-staging.yaml
+      - taskdeforderservice-staging.json

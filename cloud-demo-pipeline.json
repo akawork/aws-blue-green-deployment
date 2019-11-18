@@ -1,0 +1,695 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Parameters":{
+		"ProductServiceREPOName": {
+			"Description": "REPO Name of product service",
+			"Type": "String"
+		},
+		"OrderServiceREPOName": {
+			"Description": "REPO Name of order service",
+			"Type": "String"
+		},
+		"FrontendServiceREPOName": {
+			"Description": "REPO Name of frontend service",
+			"Type": "String"
+		},
+		"REPOSourceBranch":{
+			"Description": "REPO source branch for the whole CICD pipeline",
+			"Type": "String"
+		},
+		"EnvironmentType":{
+			"Description":"The target deployment environment of infratructure",
+			"Type":"String",
+			"Default" : "dev",
+			"AllowedValues" : ["dev", "test", "staging"]
+		}
+	},
+	"Resources":{
+		"demoServiceRoleCodePipelinePolicy":{
+		  "Type" : "AWS::IAM::ManagedPolicy",
+		  "Properties" : {
+			  "ManagedPolicyName" : {"Fn::Join" : [ "", ["CodePipelinePolicy-", { "Ref" : "AWS::Region" }, "-cloud-",{"Ref":"EnvironmentType"},"-demo"]]},
+			  "PolicyDocument" : 	{
+					"Statement": [
+						{
+							"Action": [
+								"iam:PassRole"
+							],
+							"Resource": "*",
+							"Effect": "Allow",
+							"Condition": {
+								"StringEqualsIfExists": {
+									"iam:PassedToService": [
+										"cloudformation.amazonaws.com",
+										"elasticbeanstalk.amazonaws.com",
+										"ec2.amazonaws.com",
+										"ecs-tasks.amazonaws.com"
+									]
+								}
+							}
+						},
+						{
+							"Action": [
+								"codecommit:CancelUploadArchive",
+								"codecommit:GetBranch",
+								"codecommit:GetCommit",
+								"codecommit:GetUploadArchiveStatus",
+								"codecommit:UploadArchive"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"codedeploy:CreateDeployment",
+								"codedeploy:GetApplication",
+								"codedeploy:GetApplicationRevision",
+								"codedeploy:GetDeployment",
+								"codedeploy:GetDeploymentConfig",
+								"codedeploy:RegisterApplicationRevision"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"elasticbeanstalk:*",
+								"ec2:*",
+								"elasticloadbalancing:*",
+								"autoscaling:*",
+								"cloudwatch:*",
+								"s3:*",
+								"sns:*",
+								"cloudformation:*",
+								"rds:*",
+								"sqs:*",
+								"ecs:*"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"lambda:InvokeFunction",
+								"lambda:ListFunctions"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"opsworks:CreateDeployment",
+								"opsworks:DescribeApps",
+								"opsworks:DescribeCommands",
+								"opsworks:DescribeDeployments",
+								"opsworks:DescribeInstances",
+								"opsworks:DescribeStacks",
+								"opsworks:UpdateApp",
+								"opsworks:UpdateStack"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"cloudformation:CreateStack",
+								"cloudformation:DeleteStack",
+								"cloudformation:DescribeStacks",
+								"cloudformation:UpdateStack",
+								"cloudformation:CreateChangeSet",
+								"cloudformation:DeleteChangeSet",
+								"cloudformation:DescribeChangeSet",
+								"cloudformation:ExecuteChangeSet",
+								"cloudformation:SetStackPolicy",
+								"cloudformation:ValidateTemplate"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						},
+						{
+							"Action": [
+								"codebuild:BatchGetBuilds",
+								"codebuild:StartBuild"
+							],
+							"Resource": "*",
+							"Effect": "Allow"
+						},
+						{
+							"Effect": "Allow",
+							"Action": [
+								"devicefarm:ListProjects",
+								"devicefarm:ListDevicePools",
+								"devicefarm:GetRun",
+								"devicefarm:GetUpload",
+								"devicefarm:CreateUpload",
+								"devicefarm:ScheduleRun"
+							],
+							"Resource": "*"
+						},
+						{
+							"Effect": "Allow",
+							"Action": [
+								"servicecatalog:ListProvisioningArtifacts",
+								"servicecatalog:CreateProvisioningArtifact",
+								"servicecatalog:DescribeProvisioningArtifact",
+								"servicecatalog:DeleteProvisioningArtifact",
+								"servicecatalog:UpdateProduct"
+							],
+							"Resource": "*"
+						},
+						{
+							"Effect": "Allow",
+							"Action": [
+								"cloudformation:ValidateTemplate"
+							],
+							"Resource": "*"
+						},
+						{
+							"Effect": "Allow",
+							"Action": [
+								"ecr:DescribeImages"
+							],
+							"Resource": "*"
+						}
+					],
+					"Version": "2012-10-17"
+				}
+			}
+		},
+		"demoCodePipelineServiceRole":{
+			"DependsOn" : [ "demoServiceRoleCodePipelinePolicy" ],
+			"Type" : "AWS::IAM::Role",
+			"Properties" : {
+			  "AssumeRolePolicyDocument": {
+					"Version" : "2012-10-17",
+					"Statement": [ {
+					  "Effect": "Allow",
+					  "Principal": {
+						 "Service": "codepipeline.amazonaws.com"
+					  },
+					  "Action": [ "sts:AssumeRole" ]
+				   } ]
+			   },
+			  "ManagedPolicyArns" : [{"Ref":"demoServiceRoleCodePipelinePolicy"} ],
+			  "Path" : "/service-role/",
+			  "RoleName" : {"Fn::Join" : [ "", ["CodePipelineServiceRole-", { "Ref" : "AWS::Region" }, "-cloud-",{"Ref":"EnvironmentType"},"-demo"]]}
+			}
+		},
+		"demoS3BucketCodePipeline":{
+		  "Type" : "AWS::S3::Bucket",
+		  "Properties" : {
+			  "AccessControl" : "BucketOwnerFullControl",
+			  "BucketName" : {"Fn::Join" : [ "", ["codepipline-", { "Ref" : "AWS::Region" }, "-cloud-",{"Ref":"EnvironmentType"},"-demo"]]}
+			}
+		},
+		"productServicePipeline":{
+			"DependsOn" : [ "demoS3BucketCodePipeline","demoCodePipelineServiceRole","demoServiceRoleCodePipelinePolicy" ],
+		  "Type" : "AWS::CodePipeline::Pipeline",
+		  "Properties" : {
+			  "ArtifactStore" : {
+				"Location":{"Ref":"demoS3BucketCodePipeline"},
+				"Type":"S3"
+			  },
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-pipeline-productservice"]]},
+			  "RestartExecutionOnUpdate" : true,
+			  "RoleArn" : {"Fn::GetAtt" : ["demoCodePipelineServiceRole", "Arn"] },
+			  "Stages" : [
+				{	
+					"Name":"Source",
+					"Actions":[
+						{
+						  "ActionTypeId" : {
+							"Category" : "Source",
+							"Owner" : "AWS",
+							"Provider" : "CodeCommit",
+							"Version" : "1"
+						  },
+						  "Configuration" : {
+							"RepositoryName":{"Ref":"ProductServiceREPOName"},
+							"BranchName":{"Ref":"REPOSourceBranch"}
+						  },
+						  "Name" : "Source",
+						  "OutputArtifacts" : [ {"Name":"SourceArtifact"}],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"SonarQube",
+					"Actions":[
+						{
+						  "Name" : "SonarScan",
+						  "ActionTypeId" : {
+							"Category" : "Build",
+							"Owner" : "AWS",
+							"Provider" : "CodeBuild",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"ProjectName":{"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-sonar-product-service"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Build",
+					"Actions":[
+						{
+						  "Name" : "Build",
+						  "ActionTypeId" : {
+							"Category" : "Build",
+							"Owner" : "AWS",
+							"Provider" : "CodeBuild",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"ProjectName":{"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-product-service"]]}
+						  },
+						  "OutputArtifacts" : [ {"Name":"BuildArtifact"} ],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Deploy",
+					"Actions":[
+						{
+						  "Name" : "Deploy",
+						  "ActionTypeId" : {
+							"Category" : "Deploy",
+							"Owner" : "AWS",
+							"Provider" : "CodeDeployToECS",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"BuildArtifact" }],
+						  "Configuration" : {
+							"AppSpecTemplateArtifact": "BuildArtifact",
+                            "AppSpecTemplatePath": {"Fn::Join" : [ "", ["appspecproductservice-",{"Ref":"EnvironmentType"},".yaml"]]},
+                            "ApplicationName": {"Fn::Join" : [ "", ["AppECS-cloud-",{"Ref":"EnvironmentType"},"-demo-product-service"]]},
+                            "DeploymentGroupName": {"Fn::Join" : [ "", ["DgpECS-cloud-",{"Ref":"EnvironmentType"},"-demo-product-service"]]},
+                            "TaskDefinitionTemplateArtifact": "BuildArtifact",
+                            "TaskDefinitionTemplatePath": {"Fn::Join" : [ "", ["taskdefproductservice-",{"Ref":"EnvironmentType"},".json"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				}
+			  ]
+			}
+		},
+		"productServiceDeployPipeline":{
+			"DependsOn" : [ "demoS3BucketCodePipeline","demoCodePipelineServiceRole","demoServiceRoleCodePipelinePolicy" ],
+		  "Type" : "AWS::CodePipeline::Pipeline",
+		  "Properties" : {
+			  "ArtifactStore" : {
+				"Location":{"Ref":"demoS3BucketCodePipeline"},
+				"Type":"S3"
+			  },
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-pipeline-productservice-deploy"]]},
+			  "RestartExecutionOnUpdate" : true,
+			  "RoleArn" : {"Fn::GetAtt" : ["demoCodePipelineServiceRole", "Arn"] },
+			  "Stages" : [
+				{	
+					"Name":"Source",
+					"Actions":[
+						{
+						  "ActionTypeId" : {
+							"Category" : "Source",
+							"Owner" : "AWS",
+							"Provider" : "CodeCommit",
+							"Version" : "1"
+						  },
+						  "Configuration" : {
+							"RepositoryName":"Demo.DevOps.Deployment",
+							"BranchName":"product"
+						  },
+						  "Name" : "Source",
+						  "OutputArtifacts" : [ {"Name":"SourceArtifact"}],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Deploy",
+					"Actions":[
+						{
+						  "Name" : "Deploy",
+						  "ActionTypeId" : {
+							"Category" : "Deploy",
+							"Owner" : "AWS",
+							"Provider" : "CodeDeployToECS",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"AppSpecTemplateArtifact": "SourceArtifact",
+                            "AppSpecTemplatePath": {"Fn::Join" : [ "", ["appspecproductservice-",{"Ref":"EnvironmentType"},".yaml"]]},
+                            "ApplicationName": {"Fn::Join" : [ "", ["AppECS-cloud-",{"Ref":"EnvironmentType"},"-demo-product-service"]]},
+                            "DeploymentGroupName": {"Fn::Join" : [ "", ["DgpECS-cloud-",{"Ref":"EnvironmentType"},"-demo-product-service"]]},
+                            "TaskDefinitionTemplateArtifact": "SourceArtifact",
+                            "TaskDefinitionTemplatePath": {"Fn::Join" : [ "", ["taskdefproductservice-",{"Ref":"EnvironmentType"},".json"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				}
+			  ]
+			}
+		},
+		"orderServicePipeline":{
+			"DependsOn" : [ "demoS3BucketCodePipeline","demoCodePipelineServiceRole","demoServiceRoleCodePipelinePolicy" ],
+		  "Type" : "AWS::CodePipeline::Pipeline",
+		  "Properties" : {
+			  "ArtifactStore" : {
+				"Location":{"Ref":"demoS3BucketCodePipeline"},
+				"Type":"S3"
+			  },
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-pipeline-orderservice"]]},
+			  "RestartExecutionOnUpdate" : true,
+			  "RoleArn" : {"Fn::GetAtt" : ["demoCodePipelineServiceRole", "Arn"] },
+			  "Stages" : [
+				{	
+					"Name":"Source",
+					"Actions":[
+						{
+						  "ActionTypeId" : {
+							"Category" : "Source",
+							"Owner" : "AWS",
+							"Provider" : "CodeCommit",
+							"Version" : "1"
+						  },
+						  "Configuration" : {
+							"RepositoryName":{"Ref":"OrderServiceREPOName"},
+							"BranchName":{"Ref":"REPOSourceBranch"}
+						  },
+						  "Name" : "Source",
+						  "OutputArtifacts" : [ {"Name":"SourceArtifact"}],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"SonarQube",
+					"Actions":[
+						{
+						  "Name" : "SonarScan",
+						  "ActionTypeId" : {
+							"Category" : "Build",
+							"Owner" : "AWS",
+							"Provider" : "CodeBuild",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"ProjectName":{"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-sonar-order-service"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Build",
+					"Actions":[
+						{
+						  "Name" : "Build",
+						  "ActionTypeId" : {
+							"Category" : "Build",
+							"Owner" : "AWS",
+							"Provider" : "CodeBuild",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"ProjectName":{"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-order-service"]]}
+						  },
+						  "OutputArtifacts" : [ {"Name":"BuildArtifact"} ],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Deploy",
+					"Actions":[
+						{
+						  "Name" : "Deploy",
+						  "ActionTypeId" : {
+							"Category" : "Deploy",
+							"Owner" : "AWS",
+							"Provider" : "CodeDeployToECS",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"BuildArtifact" }],
+						  "Configuration" : {
+							"AppSpecTemplateArtifact": "BuildArtifact",
+                            "AppSpecTemplatePath": {"Fn::Join" : [ "", ["appspecorderservice-",{"Ref":"EnvironmentType"},".yaml"]]},
+                            "ApplicationName": {"Fn::Join" : [ "", ["AppECS-cloud-",{"Ref":"EnvironmentType"},"-demo-order-service"]]},
+                            "DeploymentGroupName": {"Fn::Join" : [ "", ["DgpECS-cloud-",{"Ref":"EnvironmentType"},"-demo-order-service"]]},
+                            "TaskDefinitionTemplateArtifact": "BuildArtifact",
+                            "TaskDefinitionTemplatePath": {"Fn::Join" : [ "", ["taskdeforderservice-",{"Ref":"EnvironmentType"},".json"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				}
+			  ]
+			}
+		},
+		"orderServiceDeployPipeline":{
+			"DependsOn" : [ "demoS3BucketCodePipeline","demoCodePipelineServiceRole","demoServiceRoleCodePipelinePolicy" ],
+		  "Type" : "AWS::CodePipeline::Pipeline",
+		  "Properties" : {
+			  "ArtifactStore" : {
+				"Location":{"Ref":"demoS3BucketCodePipeline"},
+				"Type":"S3"
+			  },
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-pipeline-orderservice-deploy"]]},
+			  "RestartExecutionOnUpdate" : true,
+			  "RoleArn" : {"Fn::GetAtt" : ["demoCodePipelineServiceRole", "Arn"] },
+			  "Stages" : [
+				{	
+					"Name":"Source",
+					"Actions":[
+						{
+						  "ActionTypeId" : {
+							"Category" : "Source",
+							"Owner" : "AWS",
+							"Provider" : "CodeCommit",
+							"Version" : "1"
+						  },
+						  "Configuration" : {
+							"RepositoryName":"Demo.DevOps.Deployment",
+							"BranchName":"order"
+						  },
+						  "Name" : "Source",
+						  "OutputArtifacts" : [ {"Name":"SourceArtifact"}],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Deploy",
+					"Actions":[
+						{
+						  "Name" : "Deploy",
+						  "ActionTypeId" : {
+							"Category" : "Deploy",
+							"Owner" : "AWS",
+							"Provider" : "CodeDeployToECS",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"AppSpecTemplateArtifact": "SourceArtifact",
+                            "AppSpecTemplatePath": {"Fn::Join" : [ "", ["appspecorderservice-",{"Ref":"EnvironmentType"},".yaml"]]},
+                            "ApplicationName": {"Fn::Join" : [ "", ["AppECS-cloud-",{"Ref":"EnvironmentType"},"-demo-order-service"]]},
+                            "DeploymentGroupName": {"Fn::Join" : [ "", ["DgpECS-cloud-",{"Ref":"EnvironmentType"},"-demo-order-service"]]},
+                            "TaskDefinitionTemplateArtifact": "SourceArtifact",
+                            "TaskDefinitionTemplatePath": {"Fn::Join" : [ "", ["taskdeforderservice-",{"Ref":"EnvironmentType"},".json"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				}
+			  ]
+			}
+		},
+		"frontendServicePipeline":{
+			"DependsOn" : [ "demoS3BucketCodePipeline","demoCodePipelineServiceRole","demoServiceRoleCodePipelinePolicy" ],
+		  "Type" : "AWS::CodePipeline::Pipeline",
+		  "Properties" : {
+			  "ArtifactStore" : {
+				"Location":{"Ref":"demoS3BucketCodePipeline"},
+				"Type":"S3"
+			  },
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-pipeline-frontendservice"]]},
+			  "RestartExecutionOnUpdate" : true,
+			  "RoleArn" : {"Fn::GetAtt" : ["demoCodePipelineServiceRole", "Arn"] },
+			  "Stages" : [
+				{	
+					"Name":"Source",
+					"Actions":[
+						{
+						  "ActionTypeId" : {
+							"Category" : "Source",
+							"Owner" : "AWS",
+							"Provider" : "CodeCommit",
+							"Version" : "1"
+						  },
+						  "Configuration" : {
+							"RepositoryName":{"Ref":"FrontendServiceREPOName"},
+							"BranchName":{"Ref":"REPOSourceBranch"}
+						  },
+						  "Name" : "Source",
+						  "OutputArtifacts" : [ {"Name":"SourceArtifact"}],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"SonarQube",
+					"Actions":[
+						{
+						  "Name" : "SonarScan",
+						  "ActionTypeId" : {
+							"Category" : "Build",
+							"Owner" : "AWS",
+							"Provider" : "CodeBuild",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"ProjectName":{"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-sonar-frontend-service"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Build",
+					"Actions":[
+						{
+						  "Name" : "Build",
+						  "ActionTypeId" : {
+							"Category" : "Build",
+							"Owner" : "AWS",
+							"Provider" : "CodeBuild",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"ProjectName":{"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-frontend-service"]]}
+						  },
+						  "OutputArtifacts" : [ {"Name":"BuildArtifact"} ],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Deploy",
+					"Actions":[
+						{
+						  "Name" : "Deploy",
+						  "ActionTypeId" : {
+							"Category" : "Deploy",
+							"Owner" : "AWS",
+							"Provider" : "CodeDeployToECS",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"BuildArtifact" }],
+						  "Configuration" : {
+							"AppSpecTemplateArtifact": "BuildArtifact",
+                            "AppSpecTemplatePath": {"Fn::Join" : [ "", ["appspecfrontendservice-",{"Ref":"EnvironmentType"},".yaml"]]},
+                            "ApplicationName": {"Fn::Join" : [ "", ["AppECS-cloud-",{"Ref":"EnvironmentType"},"-demo-frontend-service"]]},
+                            "DeploymentGroupName": {"Fn::Join" : [ "", ["DgpECS-cloud-",{"Ref":"EnvironmentType"},"-demo-frontend-service"]]},
+                            "TaskDefinitionTemplateArtifact": "BuildArtifact",
+                            "TaskDefinitionTemplatePath": {"Fn::Join" : [ "", ["taskdeffrontendservice-",{"Ref":"EnvironmentType"},".json"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				}
+			  ]
+			}
+		},
+		"frontendServiceDeployPipeline":{
+			"DependsOn" : [ "demoS3BucketCodePipeline","demoCodePipelineServiceRole","demoServiceRoleCodePipelinePolicy" ],
+		  "Type" : "AWS::CodePipeline::Pipeline",
+		  "Properties" : {
+			  "ArtifactStore" : {
+				"Location":{"Ref":"demoS3BucketCodePipeline"},
+				"Type":"S3"
+			  },
+			  "Name" : {"Fn::Join" : [ "", ["cloud-",{"Ref":"EnvironmentType"},"-demo-pipeline-frontendservice-deploy"]]},
+			  "RestartExecutionOnUpdate" : true,
+			  "RoleArn" : {"Fn::GetAtt" : ["demoCodePipelineServiceRole", "Arn"] },
+			  "Stages" : [
+				{	
+					"Name":"Source",
+					"Actions":[
+						{
+						  "ActionTypeId" : {
+							"Category" : "Source",
+							"Owner" : "AWS",
+							"Provider" : "CodeCommit",
+							"Version" : "1"
+						  },
+						  "Configuration" : {
+							"RepositoryName":"Demo.DevOps.Deployment",
+							"BranchName":"frontend"
+						  },
+						  "Name" : "Source",
+						  "OutputArtifacts" : [ {"Name":"SourceArtifact"}],
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				},
+				{	
+					"Name":"Deploy",
+					"Actions":[
+						{
+						  "Name" : "Deploy",
+						  "ActionTypeId" : {
+							"Category" : "Deploy",
+							"Owner" : "AWS",
+							"Provider" : "CodeDeployToECS",
+							"Version" : "1"
+						  },
+						  "InputArtifacts": [{ "Name":"SourceArtifact" }],
+						  "Configuration" : {
+							"AppSpecTemplateArtifact": "SourceArtifact",
+                            "AppSpecTemplatePath": {"Fn::Join" : [ "", ["appspecfrontendservice-",{"Ref":"EnvironmentType"},".yaml"]]},
+                            "ApplicationName": {"Fn::Join" : [ "", ["AppECS-cloud-",{"Ref":"EnvironmentType"},"-demo-frontend-service"]]},
+                            "DeploymentGroupName": {"Fn::Join" : [ "", ["DgpECS-cloud-",{"Ref":"EnvironmentType"},"-demo-frontend-service"]]},
+                            "TaskDefinitionTemplateArtifact": "SourceArtifact",
+                            "TaskDefinitionTemplatePath": {"Fn::Join" : [ "", ["taskdeffrontendservice-",{"Ref":"EnvironmentType"},".json"]]}
+						  },
+						  "Region" : { "Ref" : "AWS::Region" },
+						  "RunOrder" : 1
+						}
+					]
+				}
+			  ]
+			}
+		}
+	}
+}

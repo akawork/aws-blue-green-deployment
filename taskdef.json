@@ -1,0 +1,34 @@
+{ 
+    "family": "TASKNAME", 
+    "taskRoleArn": "TASKROLE", 
+    "executionRoleArn": "EXECUTIONROLE", 
+    "networkMode": "awsvpc", 
+    "containerDefinitions": [ 
+        { 
+            "name": "TASKNAME", 
+            "image": "ECRIMAGE", 
+            "portMappings": [ 
+                { 
+                    "containerPort": PORT, 
+                    "hostPort": PORT, 
+                    "protocol": "PortProtocol" 
+                } 
+            ], 
+            "essential": true,
+            TASKENVIRONMENT
+            "logConfiguration": { 
+                "logDriver": "awslogs",
+                "options": { 
+                    "awslogs-group": "AWSLOGGROUP", 
+                    "awslogs-region": "AWSREGION", 
+                    "awslogs-stream-prefix": "ecs" 
+                } 
+            } 
+        } 
+    ],
+	"requiresCompatibilities": [
+		"FARGATE"
+	],
+    "cpu": "1024", 
+    "memory": "2048" 
+}

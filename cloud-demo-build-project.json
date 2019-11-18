@@ -1,0 +1,398 @@
+{ 
+    "AWSTemplateFormatVersion": "2010-09-09", 
+    "Parameters":{ 
+        "ProductServiceGitURL": { 
+            "Description": "GitURL of product service", 
+            "Type": "String" 
+        }, 
+        "OrderServiceGitURL": { 
+            "Description": "GitURL of order service", 
+            "Type": "String" 
+        }, 
+        "FrontendServiceGitURL": { 
+            "Description": "GitURL of frontend service", 
+            "Type": "String" 
+        },
+		"BuildBranch":{
+			"Description":"The target deployment environment for codebuild",
+			"Type":"String",
+			"Default" : "develop",
+			"AllowedValues" : ["develop", "master"]
+		},
+		"EnvironmentType":{
+			"Description":"The target deployment environment of infratructure",
+			"Type":"String",
+			"Default" : "dev",
+			"AllowedValues" : ["dev", "test", "staging"]
+		}
+    },
+	"Conditions" : {
+		"CreateStagingResources" : {"Fn::Equals" : [{"Ref" : "EnvironmentType"}, "staging"]},
+		"CreateDevResources" : {"Fn::Equals" : [{"Ref" : "EnvironmentType"}, "dev"]},
+		"CreateTestResources" : {"Fn::Equals" : [{"Ref" : "EnvironmentType"}, "test"]}
+	},
+    "Resources":{
+        "sonarScannerECRRepo":{
+          "Type" : "AWS::ECR::Repository",
+		  "Condition":"CreateDevResources",
+          "Properties" : { 
+              "RepositoryName" : "cloud-demo-sonar-scanner", 
+              "RepositoryPolicyText": { 
+                  "Version": "2008-10-17", 
+                  "Statement": [ 
+                    { 
+                      "Sid": "CodeBuildPull", 
+                      "Effect": "Allow", 
+                      "Principal": { 
+                        "Service":"codebuild.amazonaws.com" 
+                        }, 
+                      "Action": [ 
+                        "ecr:GetDownloadUrlForLayer", 
+                        "ecr:BatchGetImage", 
+                        "ecr:BatchCheckLayerAvailability" 
+                      ] 
+                    } 
+                  ] 
+                } 
+            } 
+        }, 
+        "productServiceECRRepo":{ 
+          "Type" : "AWS::ECR::Repository", 
+          "Properties" : { 
+              "RepositoryName" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-product-service"]]}
+            } 
+        }, 
+        "orderServiceECRRepo":{ 
+          "Type" : "AWS::ECR::Repository", 
+          "Properties" : { 
+              "RepositoryName" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-order-service"]]}
+            } 
+        }, 
+        "frontendServiceECRRepo":{ 
+          "Type" : "AWS::ECR::Repository", 
+          "Properties" : { 
+              "RepositoryName" : {"Fn::Join" : [ "", ["cloud-", { "Ref" : "EnvironmentType" },"-demo-frontend-service"]]}
+            } 
+        }, 
+        "productServiceCodeBuildLog":{ 
+          "Type" : "AWS::Logs::LogGroup", 
+          "Properties" : { 
+              "LogGroupName" : {"Fn::Join" : [ "", ["/aws/codebuild/cloud-", { "Ref" : "EnvironmentType" },"-demo-product-service"]]}
+            } 
+        }, 
+        "productServiceSonarBuildLog":{ 
+          "Type" : "AWS::Logs::LogGroup", 
+          "Properties" : { 
+              "LogGroupName" : {"Fn::Join" : [ "", ["/aws/codebuild/cloud-", { "Ref" : "EnvironmentType" },"-demo-sonar-product-service"]]}
+            } 
+        }, 
+        "orderServiceCodeBuildLog":{ 
+          "Type" : "AWS::Logs::LogGroup", 
+          "Properties" : { 
+              "LogGroupName" : {"Fn::Join" : [ "", ["/aws/codebuild/cloud-", { "Ref" : "EnvironmentType" },"-demo-order-service"]]}
+            } 
+        }, 
+        "orderServiceSonarBuildLog":{ 
+          "Type" : "AWS::Logs::LogGroup", 
+          "Properties" : { 
+              "LogGroupName" : {"Fn::Join" : [ "", ["/aws/codebuild/cloud-", { "Ref" : "EnvironmentType" },"-demo-sonar-order-service"]]}
+            } 
+        }, 
+        "frontendServiceCodeBuildLog":{ 
+          "Type" : "AWS::Logs::LogGroup", 
+          "Properties" : { 
+              "LogGroupName" : {"Fn::Join" : [ "", ["/aws/codebuild/cloud-", { "Ref" : "EnvironmentType" },"-demo-frontend-service"]]} 
+            } 
+        }, 
+        "frontendServiceSonarBuildLog":{ 
+          "Type" : "AWS::Logs::LogGroup", 
+          "Properties" : { 
+              "LogGroupName" : {"Fn::Join" : [ "", ["/aws/codebuild/cloud-", { "Ref" : "EnvironmentType" },"-demo-sonar-frontend-service"]]} 
+            } 
+        }, 
+        "demoServiceCodeBuildProjectPolicy":{ 
+          "Type" : "AWS::IAM::ManagedPolicy", 
+          "Properties" : { 
+              "ManagedPolicyName" : {"Fn::Join" : [ "", ["CodeBuildPolicy-", { "Ref" : "AWS::Region" }, "-cloud-",{ "Ref" : "EnvironmentType" },"-demo"]]}, 
+              "PolicyDocument" : { 
+                    "Version": "2012-10-17", 
+                    "Statement": [ 
+                        { 
+                            "Sid": "VisualEditor0", 
+                            "Effect": "Allow", 
+                            "Action": [ 
+                                "codecommit:GitPull", 
+                                "s3:GetBucketAcl", 
+                                "s3:GetBucketLocation", 
+                                "s3:GetObjectVersion" 
+                            ], 
+                            "Resource": [ 
+                                "arn:aws:codecommit:*:*:*", 
+                                {"Fn::Join" : [ "", ["arn:aws:s3:::codepipeline-", { "Ref" : "AWS::Region" },"-*"]]} 
+                            ] 
+                        }, 
+                        { 
+                            "Sid": "VisualEditor1", 
+                            "Effect": "Allow", 
+                            "Action": [ 
+                                "logs:CreateLogStream", 
+                                "logs:CreateLogGroup", 
+                                "logs:PutLogEvents" 
+                            ], 
+                            "Resource": "*" 
+                        }, 
+                        { 
+                            "Action": [ 
+                                "s3:CreateBucket", 
+                                "s3:GetObject", 
+                                "s3:List*", 
+                                "s3:PutObject" 
+                            ], 
+                            "Resource": "*", 
+                            "Effect": "Allow", 
+                            "Sid": "S3Access" 
+                        } 
+                    ] 
+                } 
+            } 
+        }, 
+        "demoCodeBuildProjectServiceRole":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy" ], 
+            "Type" : "AWS::IAM::Role", 
+            "Properties" : { 
+              "AssumeRolePolicyDocument": { 
+                    "Version" : "2012-10-17", 
+                    "Statement": [ { 
+                      "Effect": "Allow", 
+                      "Principal": { 
+                         "Service": "codebuild.amazonaws.com" 
+                      }, 
+                      "Action": [ "sts:AssumeRole" ] 
+                   } ] 
+               }, 
+              "ManagedPolicyArns" : [ "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser", {"Ref":"demoServiceCodeBuildProjectPolicy"} ], 
+              "Path" : "/service-role/", 
+              "RoleName" : {"Fn::Join" : [ "", ["CodeBuildServiceRole-", { "Ref" : "AWS::Region" }, "-cloud-",{ "Ref" : "EnvironmentType" },"-demo"]]}
+            } 
+        }, 
+        "sonarScannerECRImageCodeBuildProject":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy","demoCodeBuildProjectServiceRole" ], 
+          "Type" : "AWS::CodeBuild::Project", 
+		  "Condition":"CreateDevResources",
+          "Properties" : { 
+                "Artifacts" : { 
+                  "Type" : "NO_ARTIFACTS" 
+                }, 
+                "Environment" : { 
+                  "ComputeType" : "BUILD_GENERAL1_MEDIUM", 
+                  "Image" : "aws/codebuild/standard:2.0", 
+                  "ImagePullCredentialsType" : "CODEBUILD", 
+                  "Type" : "LINUX_CONTAINER", 
+                  "PrivilegedMode": true 
+                }, 
+                "LogsConfig":{ 
+                  "CloudWatchLogs" : { 
+                      "Status" : "ENABLED" 
+                    } 
+                }, 
+                "Name" : "cloud-demo-sonar-scanner", 
+                "ServiceRole" : {"Fn::GetAtt" : ["demoCodeBuildProjectServiceRole", "Arn"] }, 
+                "Source" : { 
+                  "BuildSpec" : "DevOps-Cloud-Demo/sonarimage_buildspec.yaml", 
+                  "Location" : {"Ref":"ProductServiceGitURL"}, 
+                  "GitCloneDepth": 1, 
+                  "Type" : "CODECOMMIT" 
+                } 
+            } 
+        }, 
+        "productServiceCodeBuildProject":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy","demoCodeBuildProjectServiceRole" ], 
+          "Type" : "AWS::CodeBuild::Project", 
+          "Properties" : { 
+                "Artifacts" : { 
+                  "Type" : "NO_ARTIFACTS" 
+                }, 
+                "Environment" : { 
+                  "ComputeType" : "BUILD_GENERAL1_MEDIUM", 
+                  "Image" : "aws/codebuild/standard:2.0", 
+                  "ImagePullCredentialsType" : "CODEBUILD", 
+                  "Type" : "LINUX_CONTAINER", 
+                  "PrivilegedMode": true 
+                }, 
+                "LogsConfig":{ 
+                  "CloudWatchLogs" : { 
+                      "Status" : "ENABLED" 
+                    } 
+                }, 
+                "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-product-service"]]}, 
+                "ServiceRole" : {"Fn::GetAtt" : ["demoCodeBuildProjectServiceRole", "Arn"] }, 
+                "Source" : { 
+                  "BuildSpec" : {"Fn::Join" : [ "", ["productservice/buildspec-",{"Ref":"EnvironmentType"},".yaml"]]}, 
+                  "Location" : {"Ref":"ProductServiceGitURL"}, 
+                  "GitCloneDepth": 1, 
+                  "Type" : "CODECOMMIT" 
+                } 
+            } 
+        }, 
+        "productServiceSonarBuildProject":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy","demoCodeBuildProjectServiceRole" ], 
+          "Type" : "AWS::CodeBuild::Project", 
+          "Properties" : { 
+                "Artifacts" : { 
+                "Type" : "NO_ARTIFACTS" 
+                }, 
+                "Environment" : { 
+                    "ComputeType" : "BUILD_GENERAL1_MEDIUM", 
+                    "Image" : {"Fn::Join" : [ "", [{ "Ref" : "AWS::AccountId" },".dkr.ecr.", { "Ref" : "AWS::Region" }, ".amazonaws.com/cloud-demo-sonar-scanner:latest"]]}, 
+                    "ImagePullCredentialsType" : "CODEBUILD", 
+                    "Type" : "LINUX_CONTAINER" 
+                }, 
+                "LogsConfig":{ 
+                    "CloudWatchLogs" : { 
+                      "Status" : "ENABLED" 
+                    } 
+                }, 
+                "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-sonar-product-service"]]}, 
+                "ServiceRole" : {"Fn::GetAtt" : ["demoCodeBuildProjectServiceRole", "Arn"] }, 
+                "Source" : { 
+                    "BuildSpec" : "productservice/sonar_buildspec.yaml", 
+                    "Location" : {"Ref":"ProductServiceGitURL"}, 
+                    "GitCloneDepth": 1, 
+                    "Type" : "CODECOMMIT" 
+                } 
+            } 
+        }, 
+        "orderServiceCodeBuildProject":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy","demoCodeBuildProjectServiceRole" ], 
+          "Type" : "AWS::CodeBuild::Project", 
+          "Properties" : { 
+                "Artifacts" : { 
+                  "Type" : "NO_ARTIFACTS" 
+                }, 
+                "Environment" : { 
+                  "ComputeType" : "BUILD_GENERAL1_MEDIUM", 
+                  "Image" : "aws/codebuild/standard:2.0", 
+                  "ImagePullCredentialsType" : "CODEBUILD", 
+                  "Type" : "LINUX_CONTAINER", 
+                  "PrivilegedMode": true 
+                }, 
+                "LogsConfig":{ 
+                    "CloudWatchLogs" : { 
+                      "Status" : "ENABLED" 
+                    } 
+                }, 
+                "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-order-service"]]}, 
+                "ServiceRole" : {"Fn::GetAtt" : ["demoCodeBuildProjectServiceRole", "Arn"] }, 
+                "Source" : { 
+                  "BuildSpec" : {"Fn::Join" : [ "", ["orderservice/buildspec-",{ "Ref" : "EnvironmentType" },".yaml"]]}, 
+                  "Location" : {"Ref":"OrderServiceGitURL"}, 
+                  "GitCloneDepth": 1, 
+                  "Type" : "CODECOMMIT" 
+                } 
+            } 
+        }, 
+        "orderServiceSonarBuildProject":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy","demoCodeBuildProjectServiceRole" ], 
+          "Type" : "AWS::CodeBuild::Project", 
+          "Properties" : { 
+                "Artifacts" : { 
+                  "Type" : "NO_ARTIFACTS" 
+                }, 
+                "Environment" : { 
+                  "ComputeType" : "BUILD_GENERAL1_MEDIUM", 
+                  "Image" : {"Fn::Join" : [ "", [{ "Ref" : "AWS::AccountId" },".dkr.ecr.", { "Ref" : "AWS::Region" }, ".amazonaws.com/cloud-demo-sonar-scanner:latest"]]}, 
+                  "ImagePullCredentialsType" : "CODEBUILD", 
+                  "Type" : "LINUX_CONTAINER" 
+                }, 
+                "LogsConfig":{ 
+                  "CloudWatchLogs" : { 
+                      "Status" : "ENABLED" 
+                    } 
+                }, 
+                "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-sonar-order-service"]]}, 
+                "ServiceRole" : {"Fn::GetAtt" : ["demoCodeBuildProjectServiceRole", "Arn"] }, 
+                "Source" : { 
+                  "BuildSpec" : "orderservice/sonar_buildspec.yaml", 
+                  "Location" : {"Ref":"OrderServiceGitURL"}, 
+                  "GitCloneDepth": 1, 
+                  "Type" : "CODECOMMIT" 
+                } 
+            } 
+        }, 
+        "frontendServiceCodeBuildProject":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy","demoCodeBuildProjectServiceRole" ], 
+          "Type" : "AWS::CodeBuild::Project", 
+          "Properties" : { 
+                "Artifacts" : { 
+                  "Type" : "NO_ARTIFACTS" 
+                }, 
+                "Environment" : { 
+                  "ComputeType" : "BUILD_GENERAL1_MEDIUM", 
+                  "Image" : "aws/codebuild/standard:2.0", 
+                  "ImagePullCredentialsType" : "CODEBUILD", 
+                  "Type" : "LINUX_CONTAINER", 
+                  "PrivilegedMode": true 
+                }, 
+                "LogsConfig":{ 
+                    "CloudWatchLogs" : { 
+                      "Status" : "ENABLED" 
+                    } 
+                }, 
+                "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-frontend-service"]]}, 
+                "ServiceRole" : {"Fn::GetAtt" : ["demoCodeBuildProjectServiceRole", "Arn"] }, 
+                "Source" : { 
+                  "BuildSpec" : {"Fn::Join" : [ "", ["buildspec-",{ "Ref" : "EnvironmentType" },".yaml"]]}, 
+                  "Location" : {"Ref":"FrontendServiceGitURL"}, 
+                  "GitCloneDepth": 1, 
+                  "Type" : "CODECOMMIT" 
+                } 
+            } 
+        }, 
+        "frontendServiceSonarBuildProject":{ 
+            "DependsOn" : [ "demoServiceCodeBuildProjectPolicy","demoCodeBuildProjectServiceRole" ], 
+          "Type" : "AWS::CodeBuild::Project", 
+          "Properties" : { 
+                "Artifacts" : { 
+                  "Type" : "NO_ARTIFACTS" 
+                }, 
+                "Environment" : { 
+                  "ComputeType" : "BUILD_GENERAL1_MEDIUM", 
+                   
+                  "Image" : {"Fn::Join" : [ "", [{ "Ref" : "AWS::AccountId" },".dkr.ecr.", { "Ref" : "AWS::Region" }, ".amazonaws.com/cloud-demo-sonar-scanner:latest"]]}, 
+                  "ImagePullCredentialsType" : "CODEBUILD", 
+                  "Type" : "LINUX_CONTAINER" 
+                }, 
+                "LogsConfig":{ 
+                    "CloudWatchLogs" : { 
+                      "Status" : "ENABLED" 
+                    } 
+                }, 
+                "Name" : {"Fn::Join" : [ "", ["cloud-",{ "Ref" : "EnvironmentType" },"-demo-sonar-frontend-service"]]}, 
+                "ServiceRole" : {"Fn::GetAtt" : ["demoCodeBuildProjectServiceRole", "Arn"] }, 
+                "Source" : { 
+                  "BuildSpec" : "sonar_buildspec.yaml", 
+                  "Location" : {"Ref":"FrontendServiceGitURL"}, 
+                  "GitCloneDepth": 1, 
+                  "Type" : "CODECOMMIT" 
+                } 
+            } 
+        } 
+    }, 
+    "Outputs" : { 
+        "ProductServiceECRRepoARN":{ 
+          "Description" : "ARN of product service repo ECR", 
+          "Value" :  { "Fn::GetAtt" : ["productServiceECRRepo", "Arn"] }, 
+          "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-ProductServiceECRRepoARN" }} 
+        }, 
+        "OrderServiceECRRepoARN":{ 
+          "Description" : "ARN of order service repo ECR", 
+          "Value" :  { "Fn::GetAtt" : ["orderServiceECRRepo", "Arn"] }, 
+          "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-OrderServiceECRRepoARN" }} 
+        }, 
+        "FrontendServiceECRRepoARN":{ 
+          "Description" : "ARN of frontend service repo ECR", 
+          "Value" :  { "Fn::GetAtt" : ["frontendServiceECRRepo", "Arn"] }, 
+          "Export" : { "Name" : {"Fn::Sub": "${AWS::StackName}-FrontendServiceECRRepoARN" }} 
+        } 
+    } 
+} 

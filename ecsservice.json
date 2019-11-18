@@ -1,0 +1,36 @@
+{
+    "cluster": "CLUSTERNAME",
+    "serviceName": "SERVICENAME",
+    "taskDefinition": "TASKNAME",
+    "loadBalancers": [
+        {
+            "targetGroupArn": "TGARN",
+            "containerName": "TASKNAME",
+            "containerPort": PORT
+        }
+    ],
+    "launchType": "FARGATE",
+	"serviceRegistries": [
+		{
+			"registryArn": "DISCOVERYSERVICEARN"
+		}
+	],
+	"deploymentConfiguration": {
+		"maximumPercent": 200,
+		"minimumHealthyPercent": 100
+	},
+    "schedulingStrategy": "REPLICA",
+    "deploymentController": {
+        "type": "CODE_DEPLOY"
+    },
+    "platformVersion": "LATEST",
+    "networkConfiguration": {
+       "awsvpcConfiguration": {
+          "assignPublicIp": "PUBLICIPOPTION",
+          "securityGroups": [ "SERVICESG" ],
+          "subnets": [ "SERVICESUBNET1", "SERVICESUBNET2" ]
+       }
+    },
+	"healthCheckGracePeriodSeconds": 300,
+    "desiredCount": 1
+}
