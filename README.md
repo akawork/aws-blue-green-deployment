@@ -142,14 +142,14 @@ For other regions, ignore this note and leave it as default.
 Since the MySQL RDS Instance was created by the CloudFormation stack with the default schema “product_db” (used for Product service), the only DB schema left that needed to create is “order_db”.
 - Windows
   - Connect to the RDS Instance by using the ssh tunnel through the Bastion.
-    - On the local machine, run the following script to create the ssh tunnel through the Bastion: ssh -v -i <KEYPAIR_FILE> -N -L 3307:<RDSENDPOINT>:<RDSPORT> ec2-user@<BASTION_PUBLICIP>
-      <KEYPAIR_FILE>: the key pair file created from [Create Key Pair](#create-key-pair) of this documentation (pem file). E.g: 
+    - On the local machine, run the following script to create the ssh tunnel through the Bastion: ssh -v -i <KEYPAIR_FILE> -N -L 3307:<RDS_ENDPOINT>:<RDS_PORT> ec2-user@<BASTION_PUBLICIP>
+      - <KEYPAIR_FILE>: the key pair file created from [Create Key Pair](#create-key-pair) of this documentation (pem file). E.g: 
     ![create key pair](docs/images/3-3-1.png)
-      <RDSENDPOINT>: the Endpoint of RDS Instance that can be taken from CloudFormation stack Outputs or AWS RDS Console. E.g: CloudFormation outputs: 
+      - <RDS_ENDPOINT>: the Endpoint of RDS Instance that can be taken from CloudFormation stack Outputs or AWS RDS Console. E.g: CloudFormation outputs: 
     ![create key pair](docs/images/3-3-2.png)
-      <RDSPORT>: the port of the DB that can be taken from AWS RDS Console
+      - <RDS_PORT>: the port of the DB that can be taken from AWS RDS Console
     ![create key pair](docs/images/3-3-3.png)
-      <BASTION_PUBLICIP>: the public IP of Bastion (On AWS Console, go to EC2 -> Instances) that allows SSH from outside. E.g: 
+      - <BASTION_PUBLICIP>: the public IP of Bastion (On AWS Console, go to EC2 -> Instances) that allows SSH from outside. E.g: 
     ![create key pair](docs/images/3-3-4.png)
     - After executing the script, the result will be like this:
     ![create key pair](docs/images/3-3-5.png)
