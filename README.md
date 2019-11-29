@@ -103,7 +103,7 @@ Note(s):
 Key Pair is used to ssh to the ec2 bastion and to create the ssh tunnel to manage backend DB.
 - **Step 1:** Open the Amazon EC2 console at https://console.aws.amazon.com/ec2/.
 - **Step 2:** In the navigation pane, under NETWORK & SECURITY, choose Key Pairs.
-- **Step 3:** Choose Create Key Pair
+- **Step 3:** Choose Create Key Pair <br/>
 ![create key pair](docs/images/2-5-3.png)
 - **Step 4:** Enter a name for the new key pair in the Key pair name field of the Create Key Pair dialog box, and then choose Create.
 ![create key pair](docs/images/2-5-5.png)
@@ -154,26 +154,26 @@ Since the MySQL RDS Instance was created by the CloudFormation stack with the de
     - After executing the script, the result will be like this:
     ![create key pair](docs/images/3-3-5.png)
   - Create “order_sb” schema.
-    - After successfully creating the SSH tunnel to the Database, connect to the MySQL database by using the following information:
-      <Hostname>: 127.0.0.1
-      <Port>: 3307 (defined in the previous script)
-      <Username>: the DatabaseUser value input in the CloudFormation parameter
-      <Password>: the DatabasePassword value input in the CloudFormation parameter
+    - After successfully creating the SSH tunnel to the Database, connect to the MySQL database by using the following information: <br/>
+      <HOST_NAME>: 127.0.0.1<br/>
+      <RDS_PORT>: 3307 (defined in the previous script)<br/>
+      <DB_USERNAME>: the DatabaseUser value input in the CloudFormation parameter<br/>
+      <DB_PASSWORD>: the DatabasePassword value input in the CloudFormation parameter<br/>
     - After connecting to the DB successfully, execute the script “create database order_db” to create the “order_db” schema.
     ![create key pair](docs/images/3-3-6.png)
     - Finally, ensure the database has the 2 required schemas which are “product_db” and “order_db” like the image above.
-- Centos
+- CentOS
   - **Step 1**: Run command: ssh -o StrictHostKeyChecking=no -i <KEYPAIR_FILE> -t ec2-user@<BASTION_PUBLICIP> "sudo yum install mysql -y"
-  - **Step 2**: Run command: ssh -o StrictHostKeyChecking=no -i <KEYPAIR_FILE> -t ec2-user@<BASTION_PUBLICIP> "mysql --host=<RDSENDPOINT> --protocol=tcp --port=3306 -u<Username> -p<Password> -e 'CREATE DATABASE IF NOT EXISTS order_db'"
+  - **Step 2**: Run command: ssh -o StrictHostKeyChecking=no -i <KEYPAIR_FILE> -t ec2-user@<BASTION_PUBLICIP> "mysql --host=<RDS_ENDPOINT> --protocol=tcp --port=3306 -u<DB_USERNAME> -p<DB_PASSWORD> -e 'CREATE DATABASE IF NOT EXISTS order_db'"
 
 ## 4. Smoke testing
 ### The application
-Accessing to the application website with address http://<PUBLICDOMAIN>/products, <PUBLICDOMAIN> is the value of the public domain name that used for mapping with the ALB DNS. E.g. http://<PUBLICDOMAIN>/products. The application is successfully deployed when it can function as expected like calling the API successfully for retrieving data from database and displaying it or adding new data to the database.
+Accessing to the application website with address http://<PUBLIC_DOMAIN>/products, <PUBLIC_DOMAIN> is the value of the public domain name that used for mapping with the ALB DNS. E.g. http://<PUBLIC_DOMAIN>/products. The application is successfully deployed when it can function as expected like calling the API successfully for retrieving data from database and displaying it or adding new data to the database.
 ![create key pair](docs/images/4-1-1.png)
  - **Product service:**
-   - **Step 1**: go to the site http://<PUBLICDOMAIN>/product-add, and add new record of the product then click on the button with icon save.
+   - **Step 1**: go to the site http://<PUBLIC_DOMAIN>/product-add, and add new record of the product then click on the button with icon save.
    ![create key pair](docs/images/4-1-2.png)
-   - **Step 2**: the site will be redirected to http://<PUBLICDOMAIN>/products, and new record added successfully will be displayed.
+   - **Step 2**: the site will be redirected to http://<PUBLIC_DOMAIN>/products, and new record added successfully will be displayed.
    ![create key pair](docs/images/4-1-3.png)
  - **Order service:**
    - **Step 1:** Click on the button with icon basket on the product data row.
@@ -198,7 +198,7 @@ Please follow the deletion guide step by step in order to clear this whole demo 
 - **Step 2:** Delete build-project stack
   - On the Stacks page in the CloudFormation console, select the “build” stack that you want to delete. The stack must be currently running.
   - In the stack details pane, choose Delete.
-  - Select Delete stack when prompted.
+  - Select Delete stack when prompted. <br/>
     **Note**: After stack deletion has begun, you cannot abort it. The stack proceeds to the DELETE_IN_PROGRESS state.
   - After the stack deletion is complete, the stack will be in the DELETE_COMPLETE state. Stacks in the DELETE_COMPLETE state are not displayed in the AWS CloudFormation console by default.
 
@@ -214,13 +214,13 @@ Please follow the deletion guide step by step in order to clear this whole demo 
   - Check the box to the left of the service to delete and choose Delete.
   - Confirm the service deletion by entering the text phrase and choose Delete.
 - **Step 2:** Delete all Deployment Application of the 3 services product, order, frontend.
-  - Sign in to the AWS Management Console and open the CodeDeploy console at https://console.aws.amazon.com/codedeploy.
+  - Sign in to the AWS Management Console and open the CodeDeploy console at https://console.aws.amazon.com/codedeploy. <br/>
     **Note**: Sign in with the same account or IAM user information that you used in Getting Started with CodeDeploy.
   - In the navigation pane, expand Deploy, and then choose Applications.
   - In the list of applications, choose the button next to the application you want to delete, and then choose Delete.
   - When prompted, enter the name of the application to confirm you want to delete it, and then choose Delete.
 - **Step 3:** Delete Custom Domain Name in API Gateway
-  - Run the script with aws cli: “aws apigateway delete-domain-name --domain-name 'api.demo.akaword.io' --region AWS-region”
+  - Run the script with aws cli: “aws apigateway delete-domain-name --domain-name 'api.demo.akaword.io' --region AWS-region” <bt/>
     **Note**: AWS-region – the AWS region setting up this demo.
 - **Step 4:** Delete API Gateway method and stage: ANY method in productservice and orderservice resource and the ‘demo’ stage
   - Sign in to the API Gateway console at https://console.aws.amazon.com/apigateway.
@@ -240,28 +240,28 @@ Please follow the deletion guide step by step in order to clear this whole demo 
   - On the Stacks page in the CloudFormation console, select the “bluegreen” infrastructure stack that you want to delete. The stack must be currently running.
   - In the stack details pane, choose Delete.
   - Select Delete stack when prompted.
-    **Note**: After stack deletion has begun, you cannot abort it. The stack proceeds to the DELETE_IN_PROGRESS state.
+    <br/>**Note**: After stack deletion has begun, you cannot abort it. The stack proceeds to the DELETE_IN_PROGRESS state.
   - After the stack deletion is complete, the stack will be in the DELETE_COMPLETE state. Stacks in the DELETE_COMPLETE state are not displayed in the AWS CloudFormation console by default.
-    **Note**: Deletion failure
+    <br/>**Note**: Deletion failure
     - Case 1: If the deletion got error related with deleting target group failed, check whether ecs tasks were all stopped and all ecs services were deleted, then delete the stack again.
     ![create key pair](docs/images/5-2-1.png)
     - Case 2: If the deletion got error related with vpclink delete failed, redo from the step 3 to step 5 and ensure these steps has done successfully.
 - **Step 7:** Delete Managed Certificates of the domains used for the api and the application of this demo
-  - In the list of certificates, select the check box for the ACM Certificate that you want to delete. For Actions, choose Delete.
+  - In the list of certificates, select the check box for the ACM Certificate that you want to delete. For Actions, choose Delete.<br/>
   **Note**: You cannot delete an ACM Certificate that is being used by another AWS service. To delete a certificate that is in use, you must first remove the certificate association.
 
 ### Delete CloudFormation pipeline stack
 - **Step 1:** Delete S3 bucket of pipeline
   - Sign in to the AWS Management Console and open the Amazon S3 console at https://console.aws.amazon.com/s3/.
-  - In the Bucket name list, choose the bucket icon next to the name of the bucket “codepipline-awsregion-cloud-dev-demo” and then choose Delete bucket.
+  - In the Bucket name list, choose the bucket icon next to the name of the bucket “codepipline-awsregion-cloud-dev-demo” and then choose Delete bucket. <br/>
   ![create key pair](docs/images/5-3-1.png)
-  - In the Delete bucket dialog box, type the name of the bucket that you want to delete for confirmation, and then choose Confirm.
+  - In the Delete bucket dialog box, type the name of the bucket that you want to delete for confirmation, and then choose Confirm. <br/>
     **Note:** The text in the dialog box changes depending on whether the bucket is empty, is used for a static website, or is used for ELB access logs.
   ![create key pair](docs/images/5-3-2.png)
 - **Step 2:** Delete CloudFormation pipeline stack
   - On the Stacks page in the CloudFormation console, select the pipeline stack that you want to delete. The stack must be currently running.
   - In the stack details pane, choose Delete.
-  - Select Delete stack when prompted.
+  - Select Delete stack when prompted. <br/>
     **Note:** After stack deletion has begun, you cannot abort it. The stack proceeds to the DELETE_IN_PROGRESS state.
   - After the stack deletion is complete, the stack will be in the DELETE_COMPLETE state. Stacks in the DELETE_COMPLETE state are not displayed in the AWS CloudFormation console by default.
 
