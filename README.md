@@ -6,29 +6,29 @@ Build a demonstration e-commerce application with Docker image for Microservices
 
 - [Blue/Green Deployment with AWS](#blue-green-deployment-with-aws-demonstration)
   - [Contents](#contents)
-  - [1. Introduction](#introduction)
+  - [Introduction](#introduction)
     - [Purpose](#purpose)
     - [Audience](#audience)
     - [System Infrastructure Design](#system-infrastructure-design)
     - [CI/CD DevOps AWS Design](#cicd-devops-aws-design)
-  - [2. Demonstration Preparation](#demonstration-preparation)
+  - [Demonstration Preparation](#demonstration-preparation)
     - [Policies Check-list for IAM user](#policies-checklist-for-iam-user)
     - [Create Access key](#create-access-key)
     - [Setup AWS CLI default configure](#setup-aws-cli-default-configure)
     - [Setup Git profile](#setup-git-profile)
     - [Create Key Pair](#create-key-pair)
-  - [3. Deployment Step](#deployment-step)
-    - [Modify config.sh file](#modify-config-file)
-    - [Setting up the whole system infrastructure](#setting-up-the-whole-system-infratructure)
+  - [Deployment Step](#deployment-step)
+    - [Modify config.sh file](#modify-config.sh-file)
+    - [Setting up the whole system infrastructure](#setting-up-the-whole-system-infrastructure)
     - [Create Database schema for microservices](#create-database-schema-for-microservices)
-  - [4. Smoke testing](#smoke-testing)
+  - [Smoke testing](#smoke-testing)
     - [The application](#the-application)
     - [The CICD pipeline](#the-cicd-pipeline)
-  - [5. Clearance](#clearance)
+  - [Clearance](#clearance)
     - [Delete CloudFormation Build stack](#delete-cloudformation-build-stack)
-    - [Delete CloudFormation Blue/Green stack](#delete-cloudformation-blue-green-stack)
+    - [Delete CloudFormation Blue/Green stack](#delete-cloudformation-infrastructure-stack)
     - [Delete CloudFormation pipeline stack](#delete-cloudformation-pipeline-stack)
-## 1. Introduction
+## Introduction
 ### Purpose
 This document describes the system resources and processes from the deployment perspective and provides comprehensive guidelines on operating and maintaining the system. The main topics covered in this document include:
   - Deployment preparations and checklists
@@ -43,8 +43,8 @@ This document mainly targets the operation team and whomever concerned with the 
 ### CI/CD DevOps AWS Design
 ![cicd devops aws design](docs/images/cicddesign.png)
 
-## 2. Demonstration Preparation
-### Policies Check-list for IAM user
+## Demonstration Preparation
+### Policies Checklist for IAM user
 The IAM user for jenkins must has the following policies attached both directly or indirectly by group for deploying successfully.
 ![iam policy checklist](docs/images/iampolicychecklist.png)
 
@@ -110,7 +110,7 @@ Key Pair is used to ssh to the ec2 bastion and to create the ssh tunnel to manag
 **Note**
 Take note this key pair name as it will be used as a parameter in the Cloud Formation **cloud-demo-bluegreen.json** template file.
 
-## 3. Deployment Step
+## Deployment Step
 ### Modify config.sh file
 Modify the config.sh file in the script folder by changing the value for the parameters in the file.
  - GITUSERNAME: the AWS GIT Credential username
@@ -166,7 +166,7 @@ Since the MySQL RDS Instance was created by the CloudFormation stack with the de
   - **Step 1**: Run command: ssh -o StrictHostKeyChecking=no -i <KEYPAIR_FILE> -t ec2-user@<BASTION_PUBLICIP> "sudo yum install mysql -y"
   - **Step 2**: Run command: ssh -o StrictHostKeyChecking=no -i <KEYPAIR_FILE> -t ec2-user@<BASTION_PUBLICIP> "mysql --host=<RDS_ENDPOINT> --protocol=tcp --port=3306 -u<DB_USERNAME> -p<DB_PASSWORD> -e 'CREATE DATABASE IF NOT EXISTS order_db'"
 
-## 4. Smoke testing
+## Smoke testing
 ### The application
 Accessing to the application website with address http://<PUBLIC_DOMAIN>/products, <PUBLIC_DOMAIN> is the value of the public domain name that used for mapping with the ALB DNS. E.g. http://<PUBLIC_DOMAIN>/products. The application is successfully deployed when it can function as expected like calling the API successfully for retrieving data from database and displaying it or adding new data to the database.
 ![create key pair](docs/images/4-1-1.png)
@@ -186,7 +186,7 @@ Ensuring 3 CICD pipeline for the 3 microservices were created successfully and a
 ![create key pair](docs/images/4-2-1.png)
 ![create key pair](docs/images/4-2-2.png)
 
-## 5.	Clearance
+## Clearance
 Please follow the deletion guide step by step in order to clear this whole demo successfully
 ### Delete CloudFormation Build stack
 - **Step 1:** Delete all 4 ECR repositories of product, order, frontend services and the sonar scanner ecr repo.
@@ -202,7 +202,7 @@ Please follow the deletion guide step by step in order to clear this whole demo 
     **Note**: After stack deletion has begun, you cannot abort it. The stack proceeds to the DELETE_IN_PROGRESS state.
   - After the stack deletion is complete, the stack will be in the DELETE_COMPLETE state. Stacks in the DELETE_COMPLETE state are not displayed in the AWS CloudFormation console by default.
 
-### Delete CloudFormation Build stack
+### Delete CloudFormation Infrastructure stack
 - **Step 1:** Stop all ECS Tasks and Delete ECS services of cluster cloud-dev-demo-cluster
   - Open the Amazon ECS console at https://console.aws.amazon.com/ecs/.
   - On the navigation bar, select the Region that your cluster is in.
